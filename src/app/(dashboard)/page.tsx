@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
-import { getMyRecentEntries, addManualEntry } from '@/utils/supabase/timeApi'
+import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes } from 'date-fns'
+import { format, differenceInMinutes, parseISO } from 'date-fns'
 
 export default function TimeLogsPage() {
   const { user } = useAuth()
@@ -13,12 +13,18 @@ export default function TimeLogsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
   
-  // Manual Entry Form State
   const [projectId, setProjectId] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
+
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [editProjectId, setEditProjectId] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
 
   useEffect(() => {
     getProjects().then(setProjects)
@@ -26,15 +32,18 @@ export default function TimeLogsPage() {
 
   useEffect(() => {
     if (user) {
-      getMyRecentEntries(user.id).then(setEntries)
+      loadEntries()
     }
   }, [user, refreshTrigger])
+
+  const loadEntries = () => {
+    if (user) getMyRecentEntries(user.id).then(setEntries)
+  }
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !projectId) return
 
-    // Construct local Date objects to insert into Supabase
     const startIso = new Date(`${date}T${startTime}`).toISOString()
     const endIso = new Date(`${date}T${endTime}`).toISOString()
 
@@ -46,9 +55,43 @@ export default function TimeLogsPage() {
       end_time: endIso
     })
 
-    // Reset and reload
     setDescription('')
-    getMyRecentEntries(user.id).then(setEntries)
+    loadEntries()
+  }
+
+  const openEditModal = (entry: TimeEntry) => {
+    const start = parseISO(entry.start_time)
+    setEditProjectId(entry.project_id)
+    setEditDescription(entry.description || '')
+    setEditDate(format(start, 'yyyy-MM-dd'))
+    setEditStartTime(format(start, 'HH:mm'))
+    setEditEndTime(entry.end_time ? format(parseISO(entry.end_time), 'HH:mm') : '')
+    setEditingEntry(entry)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEntry) return
+
+    const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
+    const endIso = editEndTime ? new Date(`${editDate}T${editEndTime}`).toISOString() : null
+
+    await updateTimeEntry(editingEntry.id, {
+      project_id: editProjectId,
+      description: editDescription,
+      start_time: startIso,
+      end_time: endIso
+    })
+
+    setEditingEntry(null)
+    loadEntries()
+  }
+
+  const handleDelete = async () => {
+    if (!editingEntry) return
+    await deleteTimeEntry(editingEntry.id)
+    setEditingEntry(null)
+    loadEntries()
   }
 
   const formatDuration = (start: string, end: string | null) => {
@@ -64,7 +107,6 @@ export default function TimeLogsPage() {
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 mb-6">Time Logs</h1>
         
-        {/* Manual Entry Form */}
         <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
           <h2 className="text-lg font-semibold mb-4">Manual Entry</h2>
           <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
@@ -102,7 +144,6 @@ export default function TimeLogsPage() {
         </div>
       </div>
 
-      {/* Recent Entries List */}
       <div>
         <h2 className="text-lg font-semibold mb-4 text-zinc-800">Recent Logs</h2>
         <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
@@ -111,7 +152,7 @@ export default function TimeLogsPage() {
               <div className="p-8 text-center text-zinc-500">No time entries logged yet.</div>
             ) : (
               entries.map(entry => (
-                <div key={entry.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-50 transition-colors">
+                <div key={entry.id} onClick={() => openEditModal(entry)} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-50 transition-colors cursor-pointer">
                   <div className="flex items-center gap-4">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
                     <div>
@@ -134,6 +175,48 @@ export default function TimeLogsPage() {
           </div>
         </div>
       </div>
+
+      {editingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-lg font-bold mb-4">Edit Time Log</h2>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Project</label>
+                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm">
+                  <option value="">Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Description</label>
+                <input type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Date</label>
+                <input type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Start Time</label>
+                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">End Time</label>
+                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div className="flex justify-between mt-6">
+                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md">Delete</button>
+                <div className="space-x-3">
+                  <button type="button" onClick={() => setEditingEntry(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-zinc-800">Save</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

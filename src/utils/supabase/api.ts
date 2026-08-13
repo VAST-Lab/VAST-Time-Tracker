@@ -36,6 +36,11 @@ export async function updateClient(id: string, updates: Partial<Client>): Promis
   return data;
 }
 
+export async function deleteClient(id: string): Promise<void> {
+  const { error } = await supabase.from('clients').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // --- PROJECTS API ---
 
 export async function getProjects(): Promise<Project[]> {
@@ -71,6 +76,11 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
   return data;
 }
 
+export async function deleteProject(id: string): Promise<void> {
+  const { error } = await supabase.from('projects').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // --- TEAMS (PROFILES) API ---
 
 export async function getTeamMembers(): Promise<Profile[]> {
@@ -93,4 +103,15 @@ export async function updateTeamMemberRole(id: string, role: UserRole): Promise<
     
   if (error) throw error;
   return data;
+}
+
+export async function updateTeamMemberName(id: string, full_name: string): Promise<Profile> {
+  const { data, error } = await supabase.from('profiles').update({ full_name }).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteTeamMember(id: string): Promise<void> {
+  const { error } = await supabase.from('profiles').delete().eq('id', id);
+  if (error) throw error;
 }

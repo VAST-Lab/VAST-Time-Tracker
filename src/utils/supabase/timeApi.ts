@@ -76,3 +76,8 @@ export async function updateTimeEntry(id: string, updates: Partial<TimeEntry>): 
   if (error) throw error;
   return data;
 }
+
+export async function deleteTimeEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('time_entries').delete().eq('id', id);
+  if (error) throw error;
+}

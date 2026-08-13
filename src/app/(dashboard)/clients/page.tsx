@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { getClients, createClient } from '@/utils/supabase/api'
+import { getClients, createClient, updateClient, deleteClient } from '@/utils/supabase/api'
 import { Client } from '@/types/supabase'
 import { useAdmin } from '@/hooks/useAdmin'
 
@@ -8,6 +8,9 @@ export default function ClientsPage() {
   const isAdmin = useAdmin()
   const [clients, setClients] = useState<Client[]>([])
   const [newClientName, setNewClientName] = useState('')
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editIsActive, setEditIsActive] = useState(true)
 
   useEffect(() => {
     loadClients()
@@ -23,6 +26,27 @@ export default function ClientsPage() {
     if (!newClientName) return
     await createClient(newClientName)
     setNewClientName('')
+    loadClients()
+  }
+
+  const openEditModal = (client: Client) => {
+    setEditName(client.name)
+    setEditIsActive(client.is_active)
+    setEditingClient(client)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingClient) return
+    await updateClient(editingClient.id, { name: editName, is_active: editIsActive })
+    setEditingClient(null)
+    loadClients()
+  }
+
+  const handleDelete = async () => {
+    if (!editingClient) return
+    await deleteClient(editingClient.id)
+    setEditingClient(null)
     loadClients()
   }
 
@@ -46,10 +70,9 @@ export default function ClientsPage() {
         </button>
       </form>
 
-      {/* Mobile: Stacked Cards / Desktop: Table */}
       <div className="grid gap-4 md:hidden">
         {clients.map(client => (
-          <div key={client.id} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <div key={client.id} onClick={() => openEditModal(client)} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm cursor-pointer">
             <div className="font-medium text-zinc-900">{client.name}</div>
             <div className="text-sm text-zinc-500">Status: {client.is_active ? 'Active' : 'Inactive'}</div>
           </div>
@@ -62,6 +85,7 @@ export default function ClientsPage() {
             <tr>
               <th className="px-6 py-4">Client Name</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200">
@@ -73,11 +97,39 @@ export default function ClientsPage() {
                     {client.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
+                <td className="px-6 py-4 text-right">
+                  <button onClick={() => openEditModal(client)} className="text-sm text-blue-600 hover:text-blue-800">Edit</button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {editingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-lg font-bold mb-4">Edit Client</h2>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Name</label>
+                <input type="text" required value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="clientActive" checked={editIsActive} onChange={(e) => setEditIsActive(e.target.checked)} className="rounded border-zinc-300" />
+                <label htmlFor="clientActive" className="text-sm font-medium text-zinc-700">Active</label>
+              </div>
+              <div className="flex justify-between mt-6">
+                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md">Delete</button>
+                <div className="space-x-3">
+                  <button type="button" onClick={() => setEditingClient(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-zinc-800">Save</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
