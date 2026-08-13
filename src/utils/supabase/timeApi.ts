@@ -64,3 +64,15 @@ export async function getMyRecentEntries(userId: string): Promise<TimeEntry[]> {
   if (error) throw error;
   return data || [];
 }
+
+export async function updateTimeEntry(id: string, updates: Partial<TimeEntry>): Promise<TimeEntry> {
+  const { data, error } = await supabase
+    .from('time_entries')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return data;
+}
