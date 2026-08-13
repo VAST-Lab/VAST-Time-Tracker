@@ -10,7 +10,7 @@ export async function getActiveTimer(userId: string): Promise<TimeEntry | null> 
     .single();
     
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
-  return data || null;
+  return (data as TimeEntry) || null;
 }
 
 export async function startTimer(userId: string, projectId: string, description: string): Promise<TimeEntry> {
@@ -62,7 +62,7 @@ export async function getMyRecentEntries(userId: string): Promise<TimeEntry[]> {
     .limit(50);
     
   if (error) throw error;
-  return data || [];
+  return (data as TimeEntry[]) || [];
 }
 
 export async function updateTimeEntry(id: string, updates: Partial<TimeEntry>): Promise<TimeEntry> {
