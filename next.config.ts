@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // Enables static HTML export
+  output: 'export',
+  basePath: 'VAST-Time-Tracker',
   images: {
     unoptimized: true, // Required for static exports
   },
