@@ -1,6 +1,7 @@
 'use client'
 import { TimerProvider } from '@/context/TimerContext'
 import GlobalTimer from '@/components/GlobalTimer'
+import ThemeToggle from '@/components/ThemeToggle'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'

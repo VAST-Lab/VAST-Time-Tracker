@@ -103,13 +103,13 @@ export default function TimeLogsPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 max-w-7xl">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 mb-6">Time Logs</h1>
         
         <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
           <h2 className="text-lg font-semibold mb-4">Manual Entry</h2>
-          <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-zinc-500 mb-1">Project</label>
               <select required value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm">
@@ -125,7 +125,7 @@ export default function TimeLogsPage() {
               <label className="block text-xs font-medium text-zinc-500 mb-1">Date</label>
               <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm" />
             </div>
-            <div className="flex gap-2">
+            <div className="md:col-span-2 flex gap-2">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-zinc-500 mb-1">Start</label>
                 <input type="time" required value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm" />
@@ -135,7 +135,7 @@ export default function TimeLogsPage() {
                 <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm" />
               </div>
             </div>
-            <div className="md:col-span-6 flex justify-end mt-2">
+            <div className="md:col-span-7 flex justify-end mt-2">
               <button type="submit" className="bg-zinc-900 text-white px-6 py-2 rounded-md hover:bg-zinc-800 text-sm font-medium">
                 Add Time
               </button>
