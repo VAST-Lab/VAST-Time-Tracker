@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { Clock, Calendar, BarChart, Folder, Users, Briefcase, LogOut } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/utils/supabase/client'
 
 const navItems = [
   { name: 'Time Logs', href: '/', icon: Clock },

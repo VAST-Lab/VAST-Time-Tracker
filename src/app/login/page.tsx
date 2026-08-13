@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function Login() {
@@ -13,9 +13,21 @@ export default function Login() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setError('Missing Supabase Environment Variables.')
+      return
+    }
     
-    const authAction = isSignUp ? supabase.auth.signUp : supabase.auth.signInWithPassword
-    const { error: authError } = await authAction({ email, password })
+    let authError = null
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password })
+      authError = error
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      authError = error
+    }
     
     if (authError) {
       setError(authError.message)
@@ -58,6 +70,7 @@ export default function Login() {
         </form>
         
         <button 
+          type="button"
           onClick={() => setIsSignUp(!isSignUp)} 
           className="mt-4 text-sm text-zinc-600 hover:text-zinc-900 hover:underline w-full text-center"
         >
