@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -22,7 +23,15 @@ export default function Login() {
     let authError = null
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            full_name: fullName
+          }
+        }
+      })
       authError = error
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -45,6 +54,16 @@ export default function Login() {
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         
         <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <input 
+              type="text" 
+              placeholder="Full Name" 
+              value={fullName} 
+              onChange={e => setFullName(e.target.value)} 
+              required 
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900" 
+            />
+          )}
           <input 
             type="email" 
             placeholder="Email" 
@@ -71,7 +90,10 @@ export default function Login() {
         
         <button 
           type="button"
-          onClick={() => setIsSignUp(!isSignUp)} 
+          onClick={() => {
+            setIsSignUp(!isSignUp)
+            setError('')
+          }} 
           className="mt-4 text-sm text-zinc-600 hover:text-zinc-900 hover:underline w-full text-center"
         >
           {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
