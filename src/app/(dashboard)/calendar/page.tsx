@@ -1,20 +1,54 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { EventDropArg, EventClickArg, DateSelectArg } from '@fullcalendar/core'
+import { EventDropArg, EventClickArg, DateSelectArg, EventContentArg } from '@fullcalendar/core'
 import { EventResizeDoneArg } from '@fullcalendar/interaction'
 import { useAuth } from '@/context/AuthContext'
+import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format } from 'date-fns'
+import { format, differenceInMinutes } from 'date-fns'
+
+function renderEventContent(eventInfo: EventContentArg) {
+  const { event } = eventInfo;
+  const { projectName, description, durationStr, colorHex, isActive } = event.extendedProps;
+  
+  return (
+    <div 
+      className={`w-full h-full flex flex-col p-1.5 rounded-sm shadow-sm overflow-hidden border-l-4 bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
+      style={{ borderLeftColor: colorHex }}
+    >
+      <div className="font-bold text-xs truncate" style={{ color: colorHex }}>
+        {projectName}
+      </div>
+      {description && (
+        <div className="text-xs text-zinc-700 dark:text-zinc-300 truncate mt-0.5 leading-tight">
+          {description}
+        </div>
+      )}
+      <div className="absolute bottom-1 right-1 font-mono text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm">
+        {durationStr}
+      </div>
+    </div>
+  );
+}
+
+const getExactDuration = (start: string, end: string | Date) => {
+  const mins = differenceInMinutes(new Date(end), new Date(start))
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${h}h ${m}m`
+}
 
 export default function CalendarPage() {
   const { user } = useAuth()
-  const [events, setEvents] = useState<any[]>([])
+  const { activeEntry } = useTimer()
+  const [dbEvents, setDbEvents] = useState<any[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [currentTime, setCurrentTime] = useState(new Date())
   
   // Create Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -33,6 +67,12 @@ export default function CalendarPage() {
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
 
+  // Tick the current time every minute for the active timer block
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
+
   useEffect(() => {
     if (user) loadCalendarData()
   }, [user])
@@ -48,20 +88,45 @@ export default function CalendarPage() {
     
     const mappedEvents = timeData.map((entry: TimeEntry) => ({
       id: entry.id,
-      title: `${entry.projects?.name}${entry.description ? ': ' + entry.description : ''}`,
       start: entry.start_time,
       end: entry.end_time || new Date().toISOString(),
-      backgroundColor: entry.projects?.color_hex || '#3788d8',
-      borderColor: entry.projects?.color_hex || '#3788d8',
       extendedProps: {
         projectId: entry.project_id,
-        description: entry.description
+        projectName: entry.projects?.name,
+        description: entry.description,
+        colorHex: entry.projects?.color_hex || '#3788d8',
+        durationStr: getExactDuration(entry.start_time, entry.end_time || new Date()),
+        isActive: false
       }
     }))
-    setEvents(mappedEvents)
+    setDbEvents(mappedEvents)
   }
 
-  // Helper to calculate duration for the UI
+  // Merge the active timer block with the saved logs
+  const calendarEvents = useMemo(() => {
+    const allEvents = [...dbEvents]
+    if (activeEntry) {
+      // Remove any overlapping saved entry for the active block before pushing the live one
+      const filtered = allEvents.filter(e => e.id !== activeEntry.id)
+      filtered.push({
+        id: activeEntry.id,
+        start: activeEntry.start_time,
+        end: currentTime.toISOString(),
+        extendedProps: {
+          projectId: activeEntry.project_id,
+          projectName: activeEntry.projects?.name || 'Running Project',
+          description: activeEntry.description,
+          colorHex: activeEntry.projects?.color_hex || '#3788d8',
+          durationStr: getExactDuration(activeEntry.start_time, currentTime),
+          isActive: true
+        }
+      })
+      return filtered
+    }
+    return allEvents
+  }, [dbEvents, activeEntry, currentTime])
+
+  // Helper to calculate duration for the UI Modals
   const calcDuration = (start: string, end: string) => {
     if (!start || !end) return '0h 0m'
     const [sh, sm] = start.split(':').map(Number)
@@ -73,6 +138,7 @@ export default function CalendarPage() {
 
   const handleEventDrop = async (dropInfo: EventDropArg) => {
     const { event } = dropInfo
+    if (event.extendedProps.isActive) return dropInfo.revert()
     if (!event.start) return dropInfo.revert()
     try {
       await updateTimeEntry(event.id, {
@@ -87,6 +153,7 @@ export default function CalendarPage() {
 
   const handleEventResize = async (resizeInfo: EventResizeDoneArg) => {
     const { event } = resizeInfo
+    if (event.extendedProps.isActive) return resizeInfo.revert()
     if (!event.end) return resizeInfo.revert()
     try {
       await updateTimeEntry(event.id, { end_time: event.end.toISOString() })
@@ -106,6 +173,7 @@ export default function CalendarPage() {
 
   const handleEventClick = (clickInfo: EventClickArg) => {
     const { event } = clickInfo
+    if (event.extendedProps.isActive) return // Prevent editing the active live timer
     setEditId(event.id)
     setEditProjectId(event.extendedProps.projectId)
     setEditDesc(event.extendedProps.description || '')
@@ -163,10 +231,24 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full flex flex-col space-y-4">
+      <style>{`
+        .dark {
+          --fc-border-color: #27272a;
+          --fc-today-bg-color: rgba(39, 39, 42, 0.5);
+        }
+        :root {
+          --fc-now-indicator-color: #ef4444;
+        }
+        .fc-timegrid-event-harness > .fc-timegrid-event {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+      `}</style>
+      
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Calendar</h1>
       
-      {/* FullCalendar wrapper. Adding dark mode text color constraints for internal grid lines */}
-      <div className="flex-1 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[600px] dark:text-zinc-100 dark:[&_.fc-theme-standard_.fc-scrollgrid]:border-zinc-800 dark:[&_.fc-theme-standard_td]:border-zinc-800 dark:[&_.fc-theme-standard_th]:border-zinc-800 dark:[&_.fc-col-header-cell-cushion]:text-zinc-300 dark:[&_.fc-timegrid-slot-label-cushion]:text-zinc-400">
+      <div className="flex-1 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[600px] dark:text-zinc-100">
         <FullCalendar
           plugins={[timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -175,11 +257,13 @@ export default function CalendarPage() {
             center: 'title',
             right: 'timeGridWeek,timeGridDay'
           }}
-          events={events}
+          events={calendarEvents}
+          eventContent={renderEventContent}
           editable={true}
           selectable={true}
           selectMirror={true}
           dayMaxEvents={true}
+          nowIndicator={true}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
           select={handleDateSelect}
