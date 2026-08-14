@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user, loading, router])
 
   if (loading || !user) {
-    return <div className="flex min-h-screen items-center justify-center bg-zinc-50">Loading...</div>
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 dark:text-zinc-100">Loading...</div>
   }
 
   const handleSignOut = async () => {
@@ -38,52 +38,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <aside className="w-64 flex-col border-r border-zinc-200 bg-white hidden md:flex">
-        <div className="p-6 border-b border-zinc-200">
-          <h2 className="font-bold text-xl tracking-tight">TimeTracker</h2>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <Link 
-                key={item.name} 
-                href={item.href} 
-                className="flex items-center space-x-3 rounded-md px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-              >
-                <Icon size={18} />
-                <span className="font-medium">{item.name}</span>
-              </Link>
-            )
-          })}
-        </nav>
-        
-        <div className="p-4 border-t border-zinc-200">
-          <button 
-            onClick={handleSignOut} 
-            className="flex w-full items-center space-x-3 rounded-md px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-          >
-            <LogOut size={18} />
-            <span className="font-medium">Log Out</span>
-          </button>
-        </div>
-      </aside>
-      
-      <main className="flex-1 flex flex-col h-screen overflow-hidden dark:bg-zinc-900">
-        <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-          <div className="flex items-center gap-4">
-            <div className="md:hidden font-bold dark:text-white">TimeTracker</div>
-            <GlobalTimer />
+    <TimerProvider>
+      <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+        <aside className="w-64 flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hidden md:flex">
+          <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
+            <h2 className="font-bold text-xl tracking-tight dark:text-white">TimeTracker</h2>
           </div>
-          <ThemeToggle />
-        </header>
+          
+          <nav className="flex-1 p-4 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link 
+                  key={item.name} 
+                  href={item.href} 
+                  className="flex items-center space-x-3 rounded-md px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                >
+                  <Icon size={18} />
+                  <span className="font-medium">{item.name}</span>
+                </Link>
+              )
+            })}
+          </nav>
+          
+          <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
+            <button 
+              onClick={handleSignOut} 
+              className="flex w-full items-center space-x-3 rounded-md px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              <LogOut size={18} />
+              <span className="font-medium">Log Out</span>
+            </button>
+          </div>
+        </aside>
+        
+        <main className="flex-1 flex flex-col h-screen overflow-hidden dark:bg-zinc-950">
+          <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-4">
+              <div className="md:hidden font-bold dark:text-white">TimeTracker</div>
+              <GlobalTimer />
+            </div>
+            <ThemeToggle />
+          </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
-            {children}
-        </div>
-      </main>
-    </div>
+          <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              {children}
+          </div>
+        </main>
+      </div>
+    </TimerProvider>
   )
 }

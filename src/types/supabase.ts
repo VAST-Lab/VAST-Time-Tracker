@@ -1,9 +1,21 @@
 export type UserRole = 'admin' | 'user';
 
+export interface Group {
+  id: string;
+  name: string;
+}
+
+export interface GroupClient {
+  group_id: string;
+  client_id: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string;
   role: UserRole;
+  group_id: string | null;
+  groups?: Group | null;
 }
 
 export interface Client {
@@ -19,7 +31,7 @@ export interface Project {
   name: string;
   color_hex: string;
   is_active: boolean;
-  clients?: Client; // For joined queries
+  clients?: Client; 
 }
 
 export interface TimeEntry {
@@ -29,6 +41,6 @@ export interface TimeEntry {
   start_time: string;
   end_time: string | null;
   description: string | null;
-  projects?: Project; // For joined queries
-  profiles?: Profile; // For joined queries
+  projects?: Project; 
+  profiles?: Profile; 
 }
