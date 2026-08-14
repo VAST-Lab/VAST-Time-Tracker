@@ -71,19 +71,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* Header Area with Global Timer */}
-          <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 bg-white">
-            <div className="md:hidden font-bold">TimeTracker</div>
-            <div className="flex-1 flex justify-center md:justify-end">
-              <GlobalTimer />
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-y-auto p-6 md:p-8">
-              {children}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden dark:bg-zinc-900">
+        <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+          <div className="flex items-center gap-4">
+            <div className="md:hidden font-bold dark:text-white">TimeTracker</div>
+            <GlobalTimer />
           </div>
-        </main>
+          <ThemeToggle />
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+            {children}
+        </div>
+      </main>
     </div>
   )
 }
