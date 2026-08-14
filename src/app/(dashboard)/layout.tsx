@@ -3,6 +3,7 @@ import { TimerProvider } from '@/context/TimerContext'
 import GlobalTimer from '@/components/GlobalTimer'
 import ThemeToggle from '@/components/ThemeToggle'
 import { useAuth } from '@/context/AuthContext'
+import { useAdmin } from '@/hooks/useAdmin'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
@@ -13,13 +14,14 @@ const navItems = [
   { name: 'Time Logs', href: '/', icon: Clock },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Reports', href: '/reports', icon: BarChart },
-  { name: 'Projects', href: '/projects', icon: Folder },
-  { name: 'Teams', href: '/teams', icon: Users },
-  { name: 'Clients', href: '/clients', icon: Briefcase },
+  { name: 'Projects', href: '/projects', icon: Folder, adminOnly: true },
+  { name: 'Teams', href: '/teams', icon: Users, adminOnly: true },
+  { name: 'Clients', href: '/clients', icon: Briefcase, adminOnly: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const isAdmin = useAdmin()
   const router = useRouter()
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/login')
   }
 
+  const visibleNavItems = navItems.filter(item => !item.adminOnly || isAdmin)
+
   return (
     <TimerProvider>
       <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
@@ -46,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon
               return (
                 <Link 
