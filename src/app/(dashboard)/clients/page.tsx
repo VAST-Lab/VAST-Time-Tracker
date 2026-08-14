@@ -55,7 +55,7 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-zinc-900">Clients</h1>
+      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Clients</h1>
       
       <form onSubmit={handleCreate} className="flex gap-4">
         <input
@@ -63,42 +63,42 @@ export default function ClientsPage() {
           value={newClientName}
           onChange={(e) => setNewClientName(e.target.value)}
           placeholder="New Client Name"
-          className="rounded-md border border-zinc-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+          className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
         />
-        <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800">
+        <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium">
           Add Client
         </button>
       </form>
 
       <div className="grid gap-4 md:hidden">
         {clients.map(client => (
-          <div key={client.id} onClick={() => openEditModal(client)} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm cursor-pointer">
-            <div className="font-medium text-zinc-900">{client.name}</div>
-            <div className="text-sm text-zinc-500">Status: {client.is_active ? 'Active' : 'Inactive'}</div>
+          <div key={client.id} onClick={() => openEditModal(client)} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm cursor-pointer">
+            <div className="font-medium text-zinc-900 dark:text-zinc-100">{client.name}</div>
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">Status: {client.is_active ? 'Active' : 'Inactive'}</div>
           </div>
         ))}
       </div>
 
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+      <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-zinc-200 bg-zinc-50 font-medium">
+          <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium">
             <tr>
-              <th className="px-6 py-4">Client Name</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Client Name</th>
+              <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Status</th>
+              <th className="px-6 py-4 text-right text-zinc-900 dark:text-zinc-100">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {clients.map((client) => (
-              <tr key={client.id} className="hover:bg-zinc-50">
-                <td className="px-6 py-4 font-medium text-zinc-900">{client.name}</td>
+              <tr key={client.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">{client.name}</td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${client.is_active ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-700'}`}>
+                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${client.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
                     {client.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button onClick={() => openEditModal(client)} className="text-sm text-blue-600 hover:text-blue-800">Edit</button>
+                  <button onClick={() => openEditModal(client)} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Edit</button>
                 </td>
               </tr>
             ))}
@@ -108,22 +108,22 @@ export default function ClientsPage() {
 
       {editingClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h2 className="text-lg font-bold mb-4">Edit Client</h2>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Client</h2>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Name</label>
-                <input type="text" required value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
+                <input type="text" required value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="clientActive" checked={editIsActive} onChange={(e) => setEditIsActive(e.target.checked)} className="rounded border-zinc-300" />
-                <label htmlFor="clientActive" className="text-sm font-medium text-zinc-700">Active</label>
+                <input type="checkbox" id="clientActive" checked={editIsActive} onChange={(e) => setEditIsActive(e.target.checked)} className="rounded border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950" />
+                <label htmlFor="clientActive" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Active</label>
               </div>
               <div className="flex justify-between mt-6">
-                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md">Delete</button>
+                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete</button>
                 <div className="space-x-3">
-                  <button type="button" onClick={() => setEditingClient(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-zinc-800">Save</button>
+                  <button type="button" onClick={() => setEditingClient(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save</button>
                 </div>
               </div>
             </form>

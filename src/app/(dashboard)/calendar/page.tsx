@@ -163,9 +163,10 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full flex flex-col space-y-4">
-      <h1 className="text-2xl font-bold text-zinc-900">Calendar</h1>
+      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Calendar</h1>
       
-      <div className="flex-1 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm min-h-[600px]">
+      {/* FullCalendar wrapper. Adding dark mode text color constraints for internal grid lines */}
+      <div className="flex-1 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[600px] dark:text-zinc-100 dark:[&_.fc-theme-standard_.fc-scrollgrid]:border-zinc-800 dark:[&_.fc-theme-standard_td]:border-zinc-800 dark:[&_.fc-theme-standard_th]:border-zinc-800 dark:[&_.fc-col-header-cell-cushion]:text-zinc-300 dark:[&_.fc-timegrid-slot-label-cushion]:text-zinc-400">
         <FullCalendar
           plugins={[timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -191,40 +192,40 @@ export default function CalendarPage() {
       {/* CREATE MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h2 className="text-lg font-bold mb-4">Log Time Block</h2>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Log Time Block</h2>
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Project</label>
-                <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
                   <option value="">Select Project...</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Description (Optional)</label>
-                <input type="text" value={modalDesc} onChange={(e) => setModalDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description (Optional)</label>
+                <input type="text" value={modalDesc} onChange={(e) => setModalDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Date</label>
-                <input type="date" required value={modalDate} onChange={(e) => setModalDate(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
+                <input type="date" required value={modalDate} onChange={(e) => setModalDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Start Time</label>
-                  <input type="time" required value={modalStartTime} onChange={(e) => setModalStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
+                  <input type="time" required value={modalStartTime} onChange={(e) => setModalStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">End Time</label>
-                  <input type="time" required value={modalEndTime} onChange={(e) => setModalEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
+                  <input type="time" required value={modalEndTime} onChange={(e) => setModalEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
-                <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 text-right">
+                <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 text-right">
                   {calcDuration(modalStartTime, modalEndTime)}
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-zinc-800">Save Time</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save Time</button>
               </div>
             </form>
           </div>
@@ -234,42 +235,42 @@ export default function CalendarPage() {
       {/* EDIT MODAL */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h2 className="text-lg font-bold mb-4">Edit Time Block</h2>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Time Block</h2>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Project</label>
-                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
                   <option value="">Select Project...</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Description</label>
-                <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+                <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Date</label>
-                <input type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
+                <input type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">Start Time</label>
-                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
+                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">End Time</label>
-                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 px-3 py-2" />
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
+                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
-                <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 text-right">
+                <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 text-right">
                   {calcDuration(editStartTime, editEndTime)}
                 </div>
               </div>
               <div className="flex justify-between mt-6">
-                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md">Delete</button>
+                <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete</button>
                 <div className="space-x-3">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-zinc-800">Save</button>
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save</button>
                 </div>
               </div>
             </form>
