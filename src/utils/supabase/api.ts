@@ -142,3 +142,23 @@ export async function updateGroupClients(group_id: string, client_ids: string[])
     if (error) throw error;
   }
 }
+
+// --- INVITATIONS API ---
+import { Invitation } from '@/types/supabase';
+
+export async function getPendingInvitations(): Promise<Invitation[]> {
+  const { data, error } = await supabase.from('invitations').select('*, groups(*)').eq('status', 'pending').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createInvitation(email: string, role: UserRole, group_id: string | null): Promise<Invitation> {
+  const { data, error } = await supabase.from('invitations').insert([{ email, role, group_id }]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteInvitation(id: string): Promise<void> {
+  const { error } = await supabase.from('invitations').delete().eq('id', id);
+  if (error) throw error;
+}

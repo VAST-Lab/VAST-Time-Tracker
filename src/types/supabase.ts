@@ -13,8 +13,19 @@ export interface GroupClient {
 export interface Profile {
   id: string;
   full_name: string;
+  email?: string; // Added email
   role: UserRole;
   group_id: string | null;
+  groups?: Group | null;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: UserRole;
+  group_id: string | null;
+  status: string;
+  created_at: string;
   groups?: Group | null;
 }
 
