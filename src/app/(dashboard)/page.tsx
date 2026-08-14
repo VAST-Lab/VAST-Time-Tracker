@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes, parseISO } from 'date-fns'
+import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 
 export default function TimeLogsPage() {
   const { user } = useAuth()
@@ -102,6 +102,57 @@ export default function TimeLogsPage() {
     return `${h}h ${m}m`
   }
 
+  const formatMins = (mins: number) => {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return `${h}h ${m}m`
+  }
+
+  // Group entries by Week and then by Day
+  const groupedData = useMemo(() => {
+    const groups = new Map<string, { startDate: Date, weekTotal: number, days: Map<string, { date: Date, dayTotal: number, entries: TimeEntry[] }> }>();
+
+    entries.forEach(entry => {
+      const start = new Date(entry.start_time);
+      const wStart = startOfWeek(start, { weekStartsOn: 1 });
+      const wEnd = endOfWeek(start, { weekStartsOn: 1 });
+      const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`;
+      const dayLabel = format(start, 'EEEE, MMM d');
+      
+      const mins = entry.end_time ? differenceInMinutes(new Date(entry.end_time), start) : differenceInMinutes(new Date(), start);
+
+      if (!groups.has(weekLabel)) {
+        groups.set(weekLabel, { startDate: wStart, weekTotal: 0, days: new Map() });
+      }
+      
+      const weekData = groups.get(weekLabel)!;
+      if (!weekData.days.has(dayLabel)) {
+        weekData.days.set(dayLabel, { date: start, dayTotal: 0, entries: [] });
+      }
+      
+      const dayData = weekData.days.get(dayLabel)!;
+      weekData.weekTotal += mins;
+      dayData.dayTotal += mins;
+      dayData.entries.push(entry);
+    });
+
+    return Array.from(groups.entries())
+      .map(([label, data]) => ({
+        label,
+        startDate: data.startDate,
+        weekTotal: data.weekTotal,
+        days: Array.from(data.days.entries())
+          .map(([dLabel, dData]) => ({
+            label: dLabel,
+            date: dData.date,
+            dayTotal: dData.dayTotal,
+            entries: dData.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+          }))
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+      }))
+      .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+  }, [entries]);
+
   return (
     <div className="space-y-8 max-w-7xl">
       <div>
@@ -146,34 +197,53 @@ export default function TimeLogsPage() {
 
       <div>
         <h2 className="text-lg font-semibold mb-4 text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {entries.length === 0 ? (
-              <div className="p-8 text-center text-zinc-500 dark:text-zinc-400">No time entries logged yet.</div>
-            ) : (
-              entries.map(entry => (
-                <div key={entry.id} onClick={() => openEditModal(entry)} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
-                    <div>
-                      <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">{entry.projects?.name}</div>
-                      <div className="text-sm text-zinc-500 dark:text-zinc-400">{entry.description || 'No description'}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 md:mt-0 flex items-center justify-between md:gap-8 md:w-1/2">
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {format(new Date(entry.start_time), 'MMM d')} <span className="mx-2 text-zinc-300 dark:text-zinc-700">|</span> 
-                      {format(new Date(entry.start_time), 'h:mm a')} - {entry.end_time ? format(new Date(entry.end_time), 'h:mm a') : 'Now'}
-                    </div>
-                    <div className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
-                      {formatDuration(entry.start_time, entry.end_time)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+        
+        {groupedData.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+            No time entries logged yet.
           </div>
-        </div>
+        ) : (
+          groupedData.map((week, wIdx) => (
+            <div key={wIdx} className="mb-8">
+              <div className="flex justify-between items-center mb-4 text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <span>{week.label}</span>
+                <span>{formatMins(week.weekTotal)}</span>
+              </div>
+              
+              <div className="space-y-4">
+                {week.days.map((day, dIdx) => (
+                  <div key={dIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{day.label}</span>
+                      <span className="text-sm font-mono text-zinc-600 dark:text-zinc-400">{formatMins(day.dayTotal)}</span>
+                    </div>
+                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {day.entries.map(entry => (
+                        <div key={entry.id} onClick={() => openEditModal(entry)} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
+                          <div className="flex items-center gap-4">
+                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
+                            <div>
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">{entry.projects?.name}</div>
+                              <div className="text-sm text-zinc-500 dark:text-zinc-400">{entry.description || 'No description'}</div>
+                            </div>
+                          </div>
+                          <div className="mt-4 md:mt-0 flex items-center justify-between md:gap-8 md:w-1/2 md:justify-end">
+                            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                              {format(new Date(entry.start_time), 'h:mm a')} - {entry.end_time ? format(new Date(entry.end_time), 'h:mm a') : 'Now'}
+                            </div>
+                            <div className="font-mono font-medium text-zinc-900 dark:text-zinc-100 w-24 text-right">
+                              {formatDuration(entry.start_time, entry.end_time)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {editingEntry && (
