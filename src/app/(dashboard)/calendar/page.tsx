@@ -16,20 +16,27 @@ function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
   const { projectName, description, durationStr, colorHex, isActive } = event.extendedProps;
   
+  const start = event.start;
+  const end = event.end || new Date();
+  const durationMins = start ? differenceInMinutes(end, start) : 60;
+  const isShort = durationMins <= 30;
+  
   return (
     <div 
-      className={`w-full h-full flex flex-col p-1.5 rounded-sm shadow-sm overflow-hidden border-l-4 bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
+      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden border-l-4 bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
       style={{ borderLeftColor: colorHex }}
     >
-      <div className="font-bold text-xs truncate" style={{ color: colorHex }}>
+      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
         {projectName}
       </div>
-      {description && (
+      
+      {!isShort && description && (
         <div className="text-xs text-zinc-700 dark:text-zinc-300 truncate mt-0.5 leading-tight">
           {description}
         </div>
       )}
-      <div className="absolute bottom-1 right-1 font-mono text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm">
+      
+      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
         {durationStr}
       </div>
     </div>
