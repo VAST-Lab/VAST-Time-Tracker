@@ -7,6 +7,7 @@ import {
 } from '@/utils/supabase/api'
 import { Profile, UserRole, Group, Client, Invitation } from '@/types/supabase'
 import { useAdmin } from '@/hooks/useAdmin'
+import { Copy, Check } from 'lucide-react'
 
 type UnifiedMember = {
   id: string;
@@ -27,6 +28,7 @@ export default function TeamsPage() {
   // Member Edit State
   const [editingMember, setEditingMember] = useState<UnifiedMember | null>(null)
   const [editName, setEditName] = useState('')
+  const [isCopied, setIsCopied] = useState(false)
 
   // Invite State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -78,10 +80,13 @@ export default function TeamsPage() {
 
   const openMemberModal = (member: UnifiedMember) => {
     if (member.isInvite) {
-      setGeneratedLink(`${window.location.origin}/login?email=${encodeURIComponent(member.email)}`)
+      // Dynamically extract the basePath by removing '/teams' from the current path
+      const basePath = window.location.pathname.replace(/\/teams$/, '')
+      setGeneratedLink(`${window.location.origin}${basePath}/login?email=${encodeURIComponent(member.email)}`)
     }
     setEditName(member.full_name)
     setEditingMember(member)
+    setIsCopied(false)
   }
 
   const handleMemberSubmit = async (e: React.FormEvent) => {
@@ -148,6 +153,12 @@ export default function TeamsPage() {
     setSelectedGroupClients(prev => 
       prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]
     )
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(generatedLink)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
   }
 
   if (isAdmin === null) return <div className="dark:text-zinc-100">Loading...</div>
@@ -292,7 +303,17 @@ export default function TeamsPage() {
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Invite Link</label>
                   <p className="text-xs text-zinc-500 mb-2">Send this link to the user to allow them to create an account attached to this email.</p>
-                  <input type="text" readOnly value={generatedLink} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 px-3 py-2 text-zinc-600 dark:text-zinc-400 text-sm font-mono select-all" />
+                  <div className="flex gap-2">
+                    <input type="text" readOnly value={generatedLink} className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 px-3 py-2 text-zinc-600 dark:text-zinc-400 text-sm font-mono select-all outline-none focus:ring-0" />
+                    <button 
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="flex items-center justify-center px-3 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                      title="Copy link"
+                    >
+                      {isCopied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-between mt-6">
                   <button type="button" onClick={handleMemberDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete Invitation</button>
