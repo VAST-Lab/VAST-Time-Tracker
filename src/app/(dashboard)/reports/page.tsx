@@ -2,10 +2,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, getTeamMembers, getClients, createProject } from '@/utils/supabase/api'
-import { bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
+import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
-import { Download, ChevronDown, Upload, X } from 'lucide-react'
+import { Download, ChevronDown, Upload, X, Edit2 } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
 import DateRangePicker from '@/components/DateRangePicker'
@@ -48,6 +48,13 @@ export default function ReportsPage() {
   
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [editProjectId, setEditProjectId] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
   
   // Filter States
   const [selectedClients, setSelectedClients] = useState<string[]>([])
@@ -296,7 +303,6 @@ export default function ReportsPage() {
       const uId = userMapping[r[uIdx]]
       const pId = projectMapping[r[pIdx]]
       
-      // Skip if either user or project is left unmapped
       if (!uId || !pId) continue
 
       const dateVal = r[dIdx]
@@ -313,6 +319,11 @@ export default function ReportsPage() {
         const parsedEnd = new Date(`${dateVal} ${endVal}`)
         if (isNaN(parsedEnd.getTime())) {
           return alert(`Invalid date/time format for row: ${dateVal} ${endVal}`)
+        }
+        
+        // Handle midnight crossover
+        if (endVal < startVal) {
+          parsedEnd.setDate(parsedEnd.getDate() + 1)
         }
         endIso = parsedEnd.toISOString()
       }
@@ -409,6 +420,49 @@ export default function ReportsPage() {
 
   const clientOptions = [...clients.map(c => ({ id: c.id, name: c.name })), { id: 'personal', name: 'Personal Projects' }]
   const visibleProjects = projects.filter(p => selectedClients.includes(p.client_id || 'personal'))
+
+  // Edit entries
+  const openEditModal = (entry: TimeEntry) => {
+    const start = parseISO(entry.start_time)
+    setEditProjectId(entry.project_id || '')
+    setEditDescription(entry.description || '')
+    setEditDate(format(start, 'yyyy-MM-dd'))
+    setEditStartTime(format(start, 'HH:mm'))
+    setEditEndTime(entry.end_time ? format(parseISO(entry.end_time), 'HH:mm') : '')
+    setEditingEntry(entry)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEntry || editingEntry.user_id !== user?.id) return
+
+    const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
+    let endIso = null
+    if (editEndTime) {
+      const endDateObj = new Date(`${editDate}T${editEndTime}`)
+      if (editEndTime < editStartTime) {
+        endDateObj.setDate(endDateObj.getDate() + 1)
+      }
+      endIso = endDateObj.toISOString()
+    }
+
+    await updateTimeEntry(editingEntry.id, {
+      project_id: editProjectId || null as any,
+      description: editDescription,
+      start_time: startIso,
+      end_time: endIso
+    })
+
+    setEditingEntry(null)
+    loadReport()
+  }
+
+  const handleDelete = async () => {
+    if (!editingEntry) return
+    await deleteTimeEntry(editingEntry.id)
+    setEditingEntry(null)
+    loadReport()
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -601,21 +655,29 @@ export default function ReportsPage() {
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {week.entries.map(entry => {
                     const duration = formatMins(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)));
+                    const canEdit = entry.user_id === user?.id;
+                    const canDelete = canEdit || isAdmin;
+
                     return (
                       <div key={entry.id} className="flex flex-col md:grid md:grid-cols-12 gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 md:items-center hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                         
-                        {/* Mobile: Top Row / Desktop: Col 1 */}
                         <div className="flex justify-between items-start md:col-span-2 md:block">
                           <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{entry.profiles?.full_name}</span>
-                          <span className="md:hidden font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100 shrink-0">{duration}</span>
+                          <div className="flex items-center gap-2 md:hidden">
+                            <span className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100 shrink-0">{duration}</span>
+                            {(canEdit || canDelete) && (
+                              <button onClick={() => openEditModal(entry)} className="text-zinc-400 hover:text-blue-500 p-1">
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         
-                        {/* Description */}
-                        <div className="md:col-span-4 text-sm text-zinc-700 dark:text-zinc-300 truncate mb-2 md:mb-0">
+                        {/* Shrunk to col-span-3 to make room for actions */}
+                        <div className="md:col-span-3 text-sm text-zinc-700 dark:text-zinc-300 truncate mb-2 md:mb-0">
                           {entry.description || '-'}
                         </div>
                         
-                        {/* Mobile: Bottom Row (Project + Time) */}
                         <div className="flex justify-between items-center md:hidden gap-2">
                           <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
                             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
@@ -626,17 +688,27 @@ export default function ReportsPage() {
                           </div>
                         </div>
 
-                        {/* Desktop Elements (Hidden on mobile) */}
                         <div className="hidden md:flex md:col-span-2 items-center gap-2 overflow-hidden">
                           <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
                           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate uppercase tracking-wider">{entry.projects?.name}</span>
                         </div>
+                        
                         <div className="hidden md:block md:col-span-3 text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
                           {format(parseISO(entry.start_time), 'MMM d, h:mm a')} <span className="mx-1 text-zinc-300 dark:text-zinc-700">-</span> {format(parseISO(entry.end_time!), 'h:mm a')}
                         </div>
+                        
                         <div className="hidden md:block md:col-span-1 text-right font-mono text-sm text-zinc-900 dark:text-zinc-100">
                           {duration}
                         </div>
+                        
+                        <div className="hidden md:flex md:col-span-1 justify-end items-center">
+                          {(canEdit || canDelete) && (
+                            <button onClick={() => openEditModal(entry)} className="text-zinc-400 hover:text-blue-500 transition-colors p-1">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                        </div>
+
                       </div>
                     )
                   })}
@@ -782,6 +854,59 @@ export default function ReportsPage() {
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Create & Select</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Entry Modal */}
+      {editingEntry && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Time Log</h3>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select disabled={editingEntry.user_id !== user?.id} value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50">
+                  <option value="">No Project</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+                <input disabled={editingEntry.user_id !== user?.id} type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
+                <input disabled={editingEntry.user_id !== user?.id} type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
+                  <input disabled={editingEntry.user_id !== user?.id} type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
+                  <input disabled={editingEntry.user_id !== user?.id} type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                </div>
+              </div>
+              
+              {!isAdmin && editingEntry.user_id !== user?.id && (
+                <div className="text-xs text-red-500 mt-2">You can only edit logs that belong to you.</div>
+              )}
+
+              <div className="flex justify-between mt-6">
+                {(editingEntry.user_id === user?.id || isAdmin) ? (
+                  <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete</button>
+                ) : <div />}
+                
+                <div className="space-x-3">
+                  <button type="button" onClick={() => setEditingEntry(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                  {editingEntry.user_id === user?.id && (
+                    <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save</button>
+                  )}
+                </div>
               </div>
             </form>
           </div>

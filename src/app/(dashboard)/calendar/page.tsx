@@ -196,7 +196,12 @@ export default function CalendarPage() {
     e.preventDefault()
     if (!user || !modalProjectId) return
     const startIso = new Date(`${modalDate}T${modalStartTime}`).toISOString()
-    const endIso = new Date(`${modalDate}T${modalEndTime}`).toISOString()
+    
+    const endDateObj = new Date(`${modalDate}T${modalEndTime}`)
+    if (modalEndTime < modalStartTime) {
+      endDateObj.setDate(endDateObj.getDate() + 1)
+    }
+    const endIso = endDateObj.toISOString()
 
     await addManualEntry({
       user_id: user.id,
@@ -216,7 +221,15 @@ export default function CalendarPage() {
     e.preventDefault()
     if (!editId) return
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
-    const endIso = editEndTime ? new Date(`${editDate}T${editEndTime}`).toISOString() : null
+    
+    let endIso = null
+    if (editEndTime) {
+      const endDateObj = new Date(`${editDate}T${editEndTime}`)
+      if (editEndTime < editStartTime) {
+        endDateObj.setDate(endDateObj.getDate() + 1)
+      }
+      endIso = endDateObj.toISOString()
+    }
 
     await updateTimeEntry(editId, {
       project_id: editProjectId,

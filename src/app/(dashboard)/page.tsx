@@ -91,7 +91,15 @@ export default function DashboardPage() {
     if (!editingEntry) return
 
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
-    const endIso = editEndTime ? new Date(`${editDate}T${editEndTime}`).toISOString() : null
+    
+    let endIso = null
+    if (editEndTime) {
+      const endDateObj = new Date(`${editDate}T${editEndTime}`)
+      if (editEndTime < editStartTime) {
+        endDateObj.setDate(endDateObj.getDate() + 1)
+      }
+      endIso = endDateObj.toISOString()
+    }
 
     await updateTimeEntry(editingEntry.id, {
       project_id: editProjectId || null as any,
@@ -114,7 +122,9 @@ export default function DashboardPage() {
   // --- FORMATTING LOGIC ---
   const formatDuration = (start: string, end: string | null) => {
     if (!end) return 'Running...'
-    const mins = differenceInMinutes(new Date(end), new Date(start))
+    let mins = differenceInMinutes(new Date(end), new Date(start))
+    if (mins < 0) mins += 1440 
+    
     const h = Math.floor(mins / 60)
     const m = mins % 60
     return `${h}h ${m}m`
