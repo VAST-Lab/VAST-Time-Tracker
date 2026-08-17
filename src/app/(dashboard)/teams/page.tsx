@@ -165,17 +165,66 @@ export default function TeamsPage() {
   if (!isAdmin) return <div className="dark:text-zinc-100">Access Denied. Administrators only.</div>
 
   return (
-    <div className="space-y-12">
-      
+    <div className="space-y-8 md:space-y-12">
+
       {/* TEAM MEMBERS SECTION */}
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Team Members</h1>
-          <button onClick={() => setIsInviteModalOpen(true)} className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium text-sm">
+          <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Team Members</h1>
+          <button onClick={() => setIsInviteModalOpen(true)} className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-3 py-1.5 md:px-4 md:py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium text-xs md:text-sm">
             Invite User
           </button>
         </div>
         
+        {/* Mobile View */}
+        <div className="grid gap-4 md:hidden">
+          {unifiedTeam.map((member) => (
+            <div key={member.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{member.full_name}</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{member.email}</div>
+                </div>
+                <span className={`shrink-0 inline-flex rounded-full px-2 py-1 text-[10px] font-medium ${member.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
+                  {member.status}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium text-zinc-500 mb-1">Role</label>
+                  <select
+                    value={member.role}
+                    disabled={member.isInvite}
+                    onChange={(e) => handleRoleChange(member, e.target.value as UserRole)}
+                    className="w-full rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 disabled:opacity-50"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-zinc-500 mb-1">Group</label>
+                  <select
+                    value={member.group_id || 'none'}
+                    disabled={member.isInvite}
+                    onChange={(e) => handleGroupChange(member, e.target.value)}
+                    className="w-full rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 disabled:opacity-50"
+                  >
+                    <option value="none">None</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-1">
+                <button onClick={() => openMemberModal(member)} className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {member.isInvite ? 'Link / Remove' : 'Edit Profile'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View */}
         <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium">
@@ -233,27 +282,27 @@ export default function TeamsPage() {
       </div>
 
       {/* ACCESS GROUPS SECTION */}
-      <div className="space-y-6 border-t border-zinc-200 dark:border-zinc-800 pt-8">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Access Groups</h2>
+      <div className="space-y-4 md:space-y-6 border-t border-zinc-200 dark:border-zinc-800 pt-6 md:pt-8">
+        <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-zinc-100">Access Groups</h2>
         
-        <form onSubmit={handleCreateGroup} className="flex gap-4">
+        <form onSubmit={handleCreateGroup} className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
             placeholder="New Group Name"
-            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
+            className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
           />
-          <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium">
+          <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium text-sm">
             Add Group
           </button>
         </form>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           {groups.map(group => (
-            <div key={group.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm flex items-center justify-between">
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">{group.name}</span>
-              <button onClick={() => openGroupModal(group)} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Edit Access</button>
+            <div key={group.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 md:p-4 shadow-sm flex items-center justify-between">
+              <span className="font-medium text-sm md:text-base text-zinc-900 dark:text-zinc-100">{group.name}</span>
+              <button onClick={() => openGroupModal(group)} className="text-xs md:text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Edit Access</button>
             </div>
           ))}
         </div>

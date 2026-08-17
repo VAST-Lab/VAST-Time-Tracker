@@ -81,23 +81,23 @@ export default function ProjectsPage() {
   if (isAdmin === null) return <div className="dark:text-zinc-100">Loading...</div>
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Projects</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Projects</h1>
       
-      <form onSubmit={handleCreate} className="flex flex-wrap gap-4 items-center bg-white dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+      <form onSubmit={handleCreate} className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4 items-stretch sm:items-center bg-white dark:bg-zinc-900 p-3 md:p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg">
         <input
           type="text"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           placeholder={isAdmin ? "New Project Name" : "New Personal Project (Only visible to you)"}
-          className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 min-w-[200px]"
+          className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 min-w-[200px]"
           required
         />
         {isAdmin && (
           <select 
             value={formData.client_id}
             onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
             required
           >
             <option value="">Select Client...</option>
@@ -105,20 +105,53 @@ export default function ProjectsPage() {
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-zinc-600 dark:text-zinc-400">Color:</label>
-          <input
-            type="color"
-            value={formData.color_hex}
-            onChange={(e) => setFormData({ ...formData, color_hex: e.target.value })}
-            className="h-9 w-9 rounded cursor-pointer border-0 p-0 bg-transparent"
-          />
+        <div className="flex justify-between sm:justify-start items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400">Color:</label>
+            <input
+              type="color"
+              value={formData.color_hex}
+              onChange={(e) => setFormData({ ...formData, color_hex: e.target.value })}
+              className="h-8 w-8 md:h-9 md:w-9 rounded cursor-pointer border-0 p-0 bg-transparent"
+            />
+          </div>
+          <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white text-sm font-medium whitespace-nowrap">
+            {isAdmin ? 'Add Project' : 'Add Personal Project'}
+          </button>
         </div>
-        <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium whitespace-nowrap">
-          {isAdmin ? 'Add Project' : 'Add Personal Project'}
-        </button>
       </form>
 
+      {/* Mobile View */}
+      <div className="grid gap-3 md:hidden">
+        {projects.map(project => {
+          const canEdit = isAdmin || project.user_id === user?.id;
+          return (
+            <div key={project.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate">{project.name}</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                    {project.user_id ? <span className="text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">Personal</span> : project.clients?.name}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-950 px-2 py-1 rounded border border-zinc-100 dark:border-zinc-800 shrink-0">
+                  <div className="w-3 h-3 rounded-full border border-zinc-300 dark:border-zinc-700" style={{ backgroundColor: project.color_hex }} />
+                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase">{project.color_hex}</span>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                {canEdit ? (
+                  <button onClick={() => openEditModal(project)} className="text-xs font-medium text-blue-600 dark:text-blue-400">Edit Project</button>
+                ) : (
+                  <span className="text-xs font-medium text-zinc-400 dark:text-zinc-600">Read Only</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      
+      {/* Desktop View */}
       <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium">

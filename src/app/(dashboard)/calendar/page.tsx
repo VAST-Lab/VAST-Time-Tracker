@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -236,6 +236,29 @@ export default function CalendarPage() {
     loadCalendarData()
   }
 
+  const calendarRef = useRef<any>(null)
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (calendarRef.current) {
+        const api = calendarRef.current.getApi()
+        const isMobile = window.innerWidth < 768
+        if (isMobile && api.view.type !== 'timeGridDay') {
+          api.changeView('timeGridDay')
+        } else if (!isMobile && api.view.type !== 'timeGridWeek') {
+          api.changeView('timeGridWeek')
+        }
+      }
+    }
+    // Delay slightly to ensure FullCalendar has initialized
+    const timeout = setTimeout(handleResize, 100)
+    window.addEventListener('resize', handleResize)
+    return () => {
+      clearTimeout(timeout)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   return (
     <div className="h-full flex flex-col space-y-4">
       <style>{`
@@ -251,12 +274,25 @@ export default function CalendarPage() {
           border: none !important;
           box-shadow: none !important;
         }
+        /* Mobile adjustments for calendar header */
+        .fc .fc-toolbar.fc-header-toolbar {
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+        @media (max-width: 768px) {
+          .fc .fc-toolbar-title { font-size: 1.125rem !important; }
+          .fc .fc-button { padding: 0.25rem 0.5rem !important; font-size: 0.875rem !important; }
+        }
       `}</style>
       
-      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Calendar</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Calendar</h1>
+      </div>
       
-      <div className="flex-1 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[600px] dark:text-zinc-100">
+      <div className="flex-1 bg-white dark:bg-zinc-900 p-2 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[500px] md:min-h-[600px] dark:text-zinc-100">
         <FullCalendar
+          ref={calendarRef}
           plugins={[timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           headerToolbar={{

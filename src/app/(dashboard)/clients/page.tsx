@@ -54,31 +54,38 @@ export default function ClientsPage() {
   if (!isAdmin) return <div>Access Denied. Administrators only.</div>
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Clients</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Clients</h1>
       
-      <form onSubmit={handleCreate} className="flex gap-4">
+      <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={newClientName}
           onChange={(e) => setNewClientName(e.target.value)}
           placeholder="New Client Name"
-          className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
+          className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
         />
-        <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white font-medium">
+        <button type="submit" className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white text-sm font-medium">
           Add Client
         </button>
       </form>
 
-      <div className="grid gap-4 md:hidden">
+      {/* Mobile View */}
+      <div className="grid gap-3 md:hidden">
         {clients.map(client => (
-          <div key={client.id} onClick={() => openEditModal(client)} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm cursor-pointer">
-            <div className="font-medium text-zinc-900 dark:text-zinc-100">{client.name}</div>
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">Status: {client.is_active ? 'Active' : 'Inactive'}</div>
+          <div key={client.id} onClick={() => openEditModal(client)} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm cursor-pointer flex justify-between items-center">
+            <div>
+              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">{client.name}</div>
+              <span className={`inline-flex mt-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${client.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                {client.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <button className="text-xs font-medium text-blue-600 dark:text-blue-400">Edit</button>
           </div>
         ))}
       </div>
 
+      {/* Desktop View */}
       <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium">
@@ -105,7 +112,7 @@ export default function ClientsPage() {
           </tbody>
         </table>
       </div>
-
+      
       {editingClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">

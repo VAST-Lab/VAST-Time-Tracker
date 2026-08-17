@@ -154,13 +154,13 @@ export default function TimeLogsPage() {
   }, [entries]);
 
   return (
-    <div className="space-y-8 max-w-7xl">
+    <div className="space-y-6 md:space-y-8 max-w-7xl">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">Time Logs</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-4 md:mb-6">Time Logs</h1>
         
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Manual Entry</h2>
-          <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
+        <div className="bg-white dark:bg-zinc-900 p-4 md:p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <h2 className="text-base md:text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Manual Entry</h2>
+          <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-end">
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Project</label>
               <select required value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
@@ -186,8 +186,8 @@ export default function TimeLogsPage() {
                 <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
               </div>
             </div>
-            <div className="md:col-span-7 flex justify-end mt-2">
-              <button type="submit" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-6 py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-white text-sm font-medium">
+            <div className="md:col-span-7 flex justify-end mt-2 md:mt-0">
+              <button type="submit" className="w-full md:w-auto bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-6 py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-white text-sm font-medium">
                 Add Time
               </button>
             </div>
@@ -196,7 +196,7 @@ export default function TimeLogsPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4 text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
+        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
         
         {groupedData.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
@@ -204,34 +204,34 @@ export default function TimeLogsPage() {
           </div>
         ) : (
           groupedData.map((week, wIdx) => (
-            <div key={wIdx} className="mb-8">
-              <div className="flex justify-between items-center mb-4 text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+            <div key={wIdx} className="mb-6 md:mb-8">
+              <div className="flex justify-between items-center mb-3 md:mb-4 text-xs md:text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                 <span>{week.label}</span>
                 <span>{formatMins(week.weekTotal)}</span>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {week.days.map((day, dIdx) => (
                   <div key={dIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
-                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{day.label}</span>
-                      <span className="text-sm font-mono text-zinc-600 dark:text-zinc-400">{formatMins(day.dayTotal)}</span>
+                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-3 md:px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                      <span className="text-xs md:text-sm font-medium text-zinc-700 dark:text-zinc-300">{day.label}</span>
+                      <span className="text-xs md:text-sm font-mono text-zinc-600 dark:text-zinc-400">{formatMins(day.dayTotal)}</span>
                     </div>
                     <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {day.entries.map(entry => (
-                        <div key={entry.id} onClick={() => openEditModal(entry)} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
-                          <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
-                            <div>
-                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">{entry.projects?.name}</div>
-                              <div className="text-sm text-zinc-500 dark:text-zinc-400">{entry.description || 'No description'}</div>
+                        <div key={entry.id} onClick={() => openEditModal(entry)} className="p-3 md:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer gap-2 sm:gap-4">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
+                            <div className="min-w-0">
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm truncate">{entry.projects?.name}</div>
+                              <div className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 truncate">{entry.description || 'No description'}</div>
                             </div>
                           </div>
-                          <div className="mt-4 md:mt-0 flex items-center justify-between md:gap-8 md:w-1/2 md:justify-end">
-                            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                            <div className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400">
                               {format(new Date(entry.start_time), 'h:mm a')} - {entry.end_time ? format(new Date(entry.end_time), 'h:mm a') : 'Now'}
                             </div>
-                            <div className="font-mono font-medium text-zinc-900 dark:text-zinc-100 w-24 text-right">
+                            <div className="font-mono font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm text-right shrink-0">
                               {formatDuration(entry.start_time, entry.end_time)}
                             </div>
                           </div>

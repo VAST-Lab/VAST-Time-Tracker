@@ -376,14 +376,14 @@ export default function ReportsPage() {
   }).length
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Reports</h1>
-        <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4">
+        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Reports</h1>
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           {isAdmin && (
             <button 
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-4 py-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-sm font-medium"
+              className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 md:px-4 py-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs md:text-sm font-medium"
             >
               <Upload size={16} />
               Import Data
@@ -392,7 +392,7 @@ export default function ReportsPage() {
           <button 
             onClick={handleExportCSV}
             disabled={entries.length === 0}
-            className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-white disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:dark:text-zinc-500 transition-colors text-sm font-medium"
+            className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-3 md:px-4 py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-white disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:dark:text-zinc-500 transition-colors text-xs md:text-sm font-medium"
           >
             <Download size={16} />
             Export to CSV
@@ -401,7 +401,7 @@ export default function ReportsPage() {
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <div>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Start Date</label>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
@@ -462,70 +462,91 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          {/* Summaries Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-              <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
-                <h3 className="font-semibold text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Project Summary</h3>
+          {/* SUMMARIES */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-xs md:text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Project Summary</h3>
               </div>
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-64 overflow-y-auto">
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 md:max-h-64 overflow-y-auto">
                 {processedData.projectSummaries.map((proj, idx) => (
-                  <li key={idx} className="px-6 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3 truncate pr-4">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
-                      <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{proj.name}</span>
+                  <li key={idx} className="px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 md:gap-3 truncate pr-4">
+                      <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                      <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate">{proj.name}</span>
                     </div>
-                    <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(proj.mins)}</span>
+                    <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(proj.mins)}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-              <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
-                <h3 className="font-semibold text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">User Summary</h3>
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-xs md:text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">User Summary</h3>
               </div>
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-64 overflow-y-auto">
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 md:max-h-64 overflow-y-auto">
                 {processedData.userSummaries.map((user, idx) => (
-                  <li key={idx} className="px-6 py-3 flex items-center justify-between">
-                    <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate pr-4">{user.name}</span>
-                    <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(user.mins)}</span>
+                  <li key={idx} className="px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-between">
+                    <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate pr-4">{user.name}</span>
+                    <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(user.mins)}</span>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
 
-          {/* Detailed Entries Section */}
-          <div className="space-y-6">
+          {/* DETAILED LIST */}
+          <div className="space-y-4 md:space-y-6">
             {processedData.weeklyData.map((week, wIdx) => (
               <div key={wIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-                <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
-                  <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">{week.label}</h3>
-                  <span className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatMins(week.mins)}</span>
+                <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                  <h3 className="font-semibold text-xs md:text-sm text-zinc-900 dark:text-zinc-100">{week.label}</h3>
+                  <span className="font-mono text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatMins(week.mins)}</span>
                 </div>
                 
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {week.entries.map(entry => (
-                    <div key={entry.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-6 py-4 items-center hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                      <div className="md:col-span-2 font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">
-                        {entry.profiles?.full_name}
+                  {week.entries.map(entry => {
+                    const duration = formatMins(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)));
+                    return (
+                      <div key={entry.id} className="flex flex-col md:grid md:grid-cols-12 gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 md:items-center hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                        
+                        {/* Mobile: Top Row / Desktop: Col 1 */}
+                        <div className="flex justify-between items-start md:col-span-2 md:block">
+                          <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{entry.profiles?.full_name}</span>
+                          <span className="md:hidden font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100 shrink-0">{duration}</span>
+                        </div>
+                        
+                        {/* Description */}
+                        <div className="md:col-span-4 text-sm text-zinc-700 dark:text-zinc-300 truncate mb-2 md:mb-0">
+                          {entry.description || '-'}
+                        </div>
+                        
+                        {/* Mobile: Bottom Row (Project + Time) */}
+                        <div className="flex justify-between items-center md:hidden gap-2">
+                          <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
+                            <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 truncate uppercase tracking-wider">{entry.projects?.name}</span>
+                          </div>
+                          <div className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 shrink-0 text-right">
+                            {format(parseISO(entry.start_time), 'MMM d, h:mm a')} <span className="mx-0.5">-</span> {format(parseISO(entry.end_time!), 'h:mm a')}
+                          </div>
+                        </div>
+
+                        {/* Desktop Elements (Hidden on mobile) */}
+                        <div className="hidden md:flex md:col-span-2 items-center gap-2 overflow-hidden">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
+                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate uppercase tracking-wider">{entry.projects?.name}</span>
+                        </div>
+                        <div className="hidden md:block md:col-span-3 text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
+                          {format(parseISO(entry.start_time), 'MMM d, h:mm a')} <span className="mx-1 text-zinc-300 dark:text-zinc-700">-</span> {format(parseISO(entry.end_time!), 'h:mm a')}
+                        </div>
+                        <div className="hidden md:block md:col-span-1 text-right font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                          {duration}
+                        </div>
                       </div>
-                      <div className="md:col-span-4 text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                        {entry.description || '-'}
-                      </div>
-                      <div className="md:col-span-2 flex items-center gap-2 overflow-hidden">
-                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
-                        <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate uppercase tracking-wider">{entry.projects?.name}</span>
-                      </div>
-                      <div className="md:col-span-3 text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
-                        {format(parseISO(entry.start_time), 'MMM d, h:mm a')} <span className="mx-1 text-zinc-300 dark:text-zinc-700">-</span> {format(parseISO(entry.end_time!), 'h:mm a')}
-                      </div>
-                      <div className="md:col-span-1 text-left md:text-right font-mono text-sm text-zinc-900 dark:text-zinc-100">
-                        {formatMins(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)))}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}
