@@ -74,3 +74,12 @@ export async function bulkInsertTimeEntries(entries: Omit<TimeEntry, 'id' | 'pro
   const { error } = await supabase.from('time_entries').insert(entries);
   if (error) throw error;
 }
+
+export async function bulkUpdateTimeEntries(ids: string[], updates: Partial<TimeEntry>): Promise<void> {
+  const chunkSize = 200;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const { error } = await supabase.from('time_entries').update(updates).in('id', chunk);
+    if (error) throw error;
+  }
+}

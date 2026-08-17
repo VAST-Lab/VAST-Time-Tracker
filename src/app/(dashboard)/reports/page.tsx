@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, getTeamMembers, getClients, createProject, getGroups } from '@/utils/supabase/api'
-import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
+import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries, bulkUpdateTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client, Group } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown, Upload, X, Edit2, Trash2 } from 'lucide-react'
@@ -49,14 +49,6 @@ export default function ReportsPage() {
   
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-
-  // Edit States
-  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
-  const [editProjectId, setEditProjectId] = useState('')
-  const [editDescription, setEditDescription] = useState('')
-  const [editDate, setEditDate] = useState('')
-  const [editStartTime, setEditStartTime] = useState('')
-  const [editEndTime, setEditEndTime] = useState('')
   
   // Filter States
   const [selectedClients, setSelectedClients] = useState<string[]>([])
@@ -71,12 +63,29 @@ export default function ReportsPage() {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
   const userDropdownRef = useRef<HTMLDivElement>(null)
 
+  const [filterDescription, setFilterDescription] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
   // Group States
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
   const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false)
   const groupDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Edit States
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [editProjectId, setEditProjectId] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
+
+  // Bulk Edit States
+  const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false)
+  const [bulkEditProjectId, setBulkEditProjectId] = useState('')
+  const [bulkEditUserId, setBulkEditUserId] = useState('')
+  const [bulkEditDescription, setBulkEditDescription] = useState('')
+  const [bulkClearDescription, setBulkClearDescription] = useState(false)
+  const [isBulkEditing, setIsBulkEditing] = useState(false)
 
   // Import Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -185,6 +194,11 @@ export default function ReportsPage() {
       filtered = filtered.filter(e => selectedUsers.includes(e.user_id))
     }
 
+    // Filter by description
+    if (filterDescription) {
+      filtered = filtered.filter(e => e.description?.toLowerCase().includes(filterDescription.toLowerCase()))
+    }
+
     const pSummary = new Map<string, { name: string, color: string, mins: number }>()
     const uSummary = new Map<string, { name: string, mins: number }>()
     const wGroups = new Map<string, { startDate: Date, mins: number, entries: TimeEntry[] }>()
@@ -220,6 +234,7 @@ export default function ReportsPage() {
     })
 
     return {
+      filteredEntries: filtered, // Expose filtered entries for bulk editing
       projectSummaries: Array.from(pSummary.values()).sort((a, b) => b.mins - a.mins),
       userSummaries: Array.from(uSummary.values()).sort((a, b) => b.mins - a.mins),
       weeklyData: Array.from(wGroups.entries())
@@ -231,7 +246,7 @@ export default function ReportsPage() {
         }))
         .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
     }
-  }, [entries, selectedClients, selectedProjects, selectedUsers])
+  }, [entries, selectedClients, selectedProjects, selectedGroups, selectedUsers, filterDescription])
 
   const formatHours = (mins: number) => {
     return `${(mins / 60).toFixed(1)}h`
@@ -519,6 +534,53 @@ export default function ReportsPage() {
     loadReport()
   }
 
+  // Bulk Edit entries
+  const handleBulkEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (processedData.filteredEntries.length === 0) return
+
+    const updates: Partial<TimeEntry> = {}
+    if (bulkEditProjectId) updates.project_id = bulkEditProjectId
+    if (bulkEditUserId) updates.user_id = bulkEditUserId
+    if (bulkClearDescription) {
+      updates.description = ''
+    } else if (bulkEditDescription) {
+      updates.description = bulkEditDescription
+    }
+
+    if (Object.keys(updates).length === 0) {
+      alert("No changes specified.")
+      return
+    }
+
+    // Limit modifications to own logs unless Admin
+    let targetIds = processedData.filteredEntries.map(e => e.id)
+    if (!isAdmin) {
+       targetIds = processedData.filteredEntries.filter(e => e.user_id === user?.id).map(e => e.id)
+    }
+
+    if (targetIds.length === 0) {
+      alert("You do not have permission to edit the selected entries.")
+      return
+    }
+
+    setIsBulkEditing(true)
+    try {
+      await bulkUpdateTimeEntries(targetIds, updates)
+      alert(`Successfully updated ${targetIds.length} entries!`)
+      setIsBulkEditModalOpen(false)
+      setBulkEditProjectId('')
+      setBulkEditUserId('')
+      setBulkEditDescription('')
+      setBulkClearDescription(false)
+      loadReport()
+    } catch (error: any) {
+      alert(`Bulk edit failed: ${error.message}`)
+    } finally {
+      setIsBulkEditing(false)
+    }
+  }
+
   // --- CLEANUP LOGIC ---
   const handleCleanupDuplicates = async () => {
     if (!confirm("Are you sure you want to scan for and delete all duplicate time entries? This cannot be undone.")) return
@@ -612,6 +674,16 @@ export default function ReportsPage() {
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4">
         <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Reports</h1>
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          
+          <button 
+            onClick={() => setIsBulkEditModalOpen(true)}
+            disabled={processedData.filteredEntries.length === 0}
+            className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 md:px-4 py-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs md:text-sm font-medium disabled:opacity-50"
+          >
+            <Edit2 size={16} />
+            Bulk Edit
+          </button>
+
           {isAdmin && (
             <>
               <button 
@@ -642,7 +714,7 @@ export default function ReportsPage() {
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 md:gap-4">
         
         <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
@@ -780,6 +852,18 @@ export default function ReportsPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Filter by Description */}
+        <div>
+          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Description</label>
+          <input
+            type="text"
+            value={filterDescription}
+            onChange={e => setFilterDescription(e.target.value)}
+            placeholder="Contains text..."
+            className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+          />
         </div>
 
       </div>
@@ -1101,7 +1185,70 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* CLEANUP MODAL */}
+      {/* Bulk Edit Entries Modal */}
+      {isBulkEditModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800 flex flex-col">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <Edit2 size={20} />
+                Bulk Edit Entries
+              </h2>
+              <button onClick={() => setIsBulkEditModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={20} /></button>
+            </div>
+            
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+              You are about to edit <span className="font-bold text-zinc-900 dark:text-zinc-100">{processedData.filteredEntries.length}</span> entries matching your current filters. Leave a field blank to keep its current value.
+              {!isAdmin && <span className="block mt-1 text-red-500">Note: You can only bulk edit entries you created.</span>}
+            </p>
+
+            <form onSubmit={handleBulkEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">New Project</label>
+                <select value={bulkEditProjectId} onChange={(e) => setBulkEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                  <option value="">-- No Change --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">New User</label>
+                  <select value={bulkEditUserId} onChange={(e) => setBulkEditUserId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                    <option value="">-- No Change --</option>
+                    {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">New Description</label>
+                <input 
+                  type="text" 
+                  value={bulkEditDescription} 
+                  onChange={(e) => setBulkEditDescription(e.target.value)} 
+                  disabled={bulkClearDescription}
+                  placeholder="-- No Change --"
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" 
+                />
+                <label className="flex items-center gap-2 mt-2">
+                  <input type="checkbox" checked={bulkClearDescription} onChange={e => setBulkClearDescription(e.target.checked)} className="rounded border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950" />
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Clear description on all entries</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <button type="button" onClick={() => setIsBulkEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                <button type="submit" disabled={isBulkEditing || (!bulkEditProjectId && !bulkEditUserId && !bulkEditDescription && !bulkClearDescription)} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {isBulkEditing ? 'Applying...' : 'Apply Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cleanup Modal */}
       {isCleanupModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800 flex flex-col">
