@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
-import { getProjects, getTeamMembers } from '@/utils/supabase/api'
+import { getProjects, getTeamMembers, getClients, createProject } from '@/utils/supabase/api'
 import { bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
-import { Project, Profile, TimeEntry } from '@/types/supabase'
+import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown, Upload, X } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
+import { useAuth } from '@/context/AuthContext'
 
 type ReportUser = {
   userName: string;
@@ -37,10 +38,12 @@ function parseCSVLine(text: string) {
 }
 
 export default function ReportsPage() {
+  const { user } = useAuth()
   const isAdmin = useAdmin()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [team, setTeam] = useState<Profile[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -64,10 +67,18 @@ export default function ReportsPage() {
   const [userMapping, setUserMapping] = useState<Record<string, string>>({})
   const [projectMapping, setProjectMapping] = useState<Record<string, string>>({})
 
+  // Inline Create Project States
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false)
+  const [createProjectCsvKey, setCreateProjectCsvKey] = useState('')
+  const [createProjectName, setCreateProjectName] = useState('')
+  const [createProjectClientId, setCreateProjectClientId] = useState('')
+  const [createProjectColor, setCreateProjectColor] = useState('#FF5733')
+
   useEffect(() => {
-    Promise.all([getProjects(), getTeamMembers()]).then(([p, t]) => {
+    Promise.all([getProjects(), getTeamMembers(), getClients()]).then(([p, t, c]) => {
       setProjects(p)
       setTeam(t)
+      setClients(c.filter(client => client.is_active))
     })
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -195,7 +206,6 @@ export default function ReportsPage() {
     a.click()
   }
 
-  // --- IMPORT LOGIC ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -219,7 +229,6 @@ export default function ReportsPage() {
     const uniqueUsers = Array.from(new Set(rows.map(r => r[uIdx]).filter(Boolean)))
     const uniqueProjects = Array.from(new Set(rows.map(r => r[pIdx]).filter(Boolean)))
 
-    // Auto-map based on exact string match
     const initialUserMap: Record<string, string> = {}
     uniqueUsers.forEach(cu => {
       const match = team.find(t => t.full_name.toLowerCase() === cu.toLowerCase())
@@ -242,12 +251,6 @@ export default function ReportsPage() {
   }
 
   const handleConfirmImport = async () => {
-    const missingUser = csvUsers.find(u => !userMapping[u])
-    if (missingUser) return alert(`Please map a user for: ${missingUser}`)
-    
-    const missingProj = csvProjects.find(p => !projectMapping[p])
-    if (missingProj) return alert(`Please map a project for: ${missingProj}`)
-
     const uIdx = csvHeaders.indexOf('user')
     const pIdx = csvHeaders.indexOf('project')
     const dIdx = csvHeaders.indexOf('date')
@@ -258,6 +261,12 @@ export default function ReportsPage() {
     const toInsert = []
     
     for (const r of csvRows) {
+      const uId = userMapping[r[uIdx]]
+      const pId = projectMapping[r[pIdx]]
+      
+      // Skip if either user or project is left unmapped
+      if (!uId || !pId) continue
+
       const dateVal = r[dIdx]
       const startVal = r[startIdx]
       const endVal = r[endIdx]
@@ -277,12 +286,17 @@ export default function ReportsPage() {
       }
 
       toInsert.push({
-        user_id: userMapping[r[uIdx]],
-        project_id: projectMapping[r[pIdx]],
+        user_id: uId,
+        project_id: pId,
         description: descIdx > -1 ? r[descIdx] : '',
         start_time: parsedStart.toISOString(),
         end_time: endIso,
       })
+    }
+
+    if (toInsert.length === 0) {
+      alert("No mapped rows available to import.")
+      return
     }
 
     try {
@@ -304,7 +318,7 @@ export default function ReportsPage() {
       })
 
       if (newEntries.length === 0) {
-        alert("All entries are duplicates. Nothing to import.")
+        alert("All mapped entries are duplicates. Nothing to import.")
         closeImportModal()
         return
       }
@@ -318,6 +332,34 @@ export default function ReportsPage() {
     }
   }
 
+  const handleCreateInlineProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!createProjectName || !user) return
+
+    const isPersonal = !isAdmin || createProjectClientId === 'personal'
+    
+    try {
+      const newProj = await createProject({
+        name: createProjectName,
+        client_id: isPersonal ? null : createProjectClientId,
+        user_id: isPersonal ? user.id : null,
+        color_hex: createProjectColor
+      })
+
+      setProjects(prev => [...prev, newProj])
+      
+      if (createProjectCsvKey) {
+        setProjectMapping(prev => ({...prev, [createProjectCsvKey]: newProj.id}))
+      }
+
+      setIsCreateProjectModalOpen(false)
+      setCreateProjectName('')
+      setCreateProjectCsvKey('')
+    } catch (error: any) {
+      alert(`Failed to create project: ${error.message}`)
+    }
+  }
+
   const closeImportModal = () => {
     setIsImportModalOpen(false)
     setImportStep(1)
@@ -326,6 +368,12 @@ export default function ReportsPage() {
     setUserMapping({})
     setProjectMapping({})
   }
+
+  const rowsToImportCount = csvRows.filter(r => {
+    const uIdx = csvHeaders.indexOf('user')
+    const pIdx = csvHeaders.indexOf('project')
+    return userMapping[r[uIdx]] && projectMapping[r[pIdx]]
+  }).length
 
   return (
     <div className="space-y-6">
@@ -530,7 +578,7 @@ export default function ReportsPage() {
                         onChange={e => setUserMapping({...userMapping, [u]: e.target.value})}
                         className="w-1/2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
                       >
-                        <option value="">Select User...</option>
+                        <option value="">Skip (Do not import)</option>
                         {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                       </select>
                     </div>
@@ -542,24 +590,86 @@ export default function ReportsPage() {
                   {csvProjects.map(p => (
                     <div key={p} className="flex items-center justify-between mb-3">
                       <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium truncate pr-4">{p}</span>
-                      <select 
-                        value={projectMapping[p] || ''} 
-                        onChange={e => setProjectMapping({...projectMapping, [p]: e.target.value})}
-                        className="w-1/2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
-                      >
-                        <option value="">Select Project...</option>
-                        {projects.map(dbP => <option key={dbP.id} value={dbP.id}>{dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
-                      </select>
+                      <div className="w-1/2 flex gap-2">
+                        <select 
+                          value={projectMapping[p] || ''} 
+                          onChange={e => setProjectMapping({...projectMapping, [p]: e.target.value})}
+                          className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+                        >
+                          <option value="">Skip (Do not import)</option>
+                          {projects.map(dbP => <option key={dbP.id} value={dbP.id}>{dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
+                        </select>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setCreateProjectCsvKey(p)
+                            setCreateProjectName(p)
+                            setIsCreateProjectModalOpen(true)
+                          }}
+                          className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-medium shrink-0"
+                        >
+                          + New
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
                   <button onClick={closeImportModal} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
-                  <button onClick={handleConfirmImport} className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Confirm Import ({csvRows.length} Rows)</button>
+                  <button onClick={handleConfirmImport} className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">
+                    Confirm Import ({rowsToImportCount} Rows)
+                  </button>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* INLINE CREATE PROJECT MODAL */}
+      {isCreateProjectModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Quick Create Project</h3>
+            <form onSubmit={handleCreateInlineProject} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={createProjectName} 
+                  onChange={(e) => setCreateProjectName(e.target.value)} 
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Client</label>
+                <select 
+                  required 
+                  value={createProjectClientId} 
+                  onChange={(e) => setCreateProjectClientId(e.target.value)} 
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
+                >
+                  <option value="">Select Client...</option>
+                  <option value="personal">-- Personal Project --</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Color:</label>
+                <input 
+                  type="color" 
+                  value={createProjectColor} 
+                  onChange={(e) => setCreateProjectColor(e.target.value)} 
+                  className="h-9 w-9 rounded cursor-pointer border-0 p-0 bg-transparent" 
+                />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Create & Select</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
