@@ -19,7 +19,7 @@ function renderEventContent(eventInfo: EventContentArg) {
   const start = event.start;
   const end = event.end || new Date();
   const durationMins = start ? differenceInMinutes(end, start) : 60;
-  const isShort = durationMins <= 30;
+  const isShort = durationMins <= 45;
   
   return (
     <div 
