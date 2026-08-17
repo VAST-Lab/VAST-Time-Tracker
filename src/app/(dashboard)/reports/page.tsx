@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
-import { getProjects, getTeamMembers, getClients, createProject } from '@/utils/supabase/api'
+import { getProjects, getTeamMembers, getClients, createProject, getGroups } from '@/utils/supabase/api'
 import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
-import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
+import { Project, Profile, TimeEntry, Client, Group } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown, Upload, X, Edit2, Trash2 } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
@@ -45,10 +45,12 @@ export default function ReportsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [team, setTeam] = useState<Profile[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
+  // Edit States
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [editProjectId, setEditProjectId] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -70,6 +72,11 @@ export default function ReportsPage() {
   const userDropdownRef = useRef<HTMLDivElement>(null)
 
   const [isLoading, setIsLoading] = useState(true)
+
+  // Group States
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+  const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false)
+  const groupDropdownRef = useRef<HTMLDivElement>(null)
 
   // Import Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -97,9 +104,10 @@ export default function ReportsPage() {
   const [createProjectColor, setCreateProjectColor] = useState('#FF5733')
 
   useEffect(() => {
-    Promise.all([getProjects(), getTeamMembers(), getClients()]).then(([p, t, c]) => {
+    Promise.all([getProjects(), getTeamMembers(), getClients(), getGroups()]).then(([p, t, c, g]) => {
       setProjects(p)
       setTeam(t)
+      setGroups(g)
       const activeClients = c.filter(client => client.is_active)
       setClients(activeClients)
       // Default to all actual clients, explicitly excluding 'personal'
@@ -112,6 +120,9 @@ export default function ReportsPage() {
       }
       if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target as Node)) {
         setIsProjectDropdownOpen(false)
+      }
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(event.target as Node)) {
+        setIsGroupDropdownOpen(false)
       }
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
         setIsUserDropdownOpen(false)
@@ -144,6 +155,9 @@ export default function ReportsPage() {
   const toggleProject = (id: string) => {
     setSelectedProjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
+  const toggleGroup = (id: string) => {
+    setSelectedGroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
   const toggleUser = (id: string) => {
     setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -160,6 +174,13 @@ export default function ReportsPage() {
     if (selectedProjects.length > 0) {
       filtered = filtered.filter(e => selectedProjects.includes(e.project_id))
     }
+
+    // Filter by Access Group
+    if (selectedGroups.length > 0) {
+      const validUserIds = team.filter(u => u.group_id && selectedGroups.includes(u.group_id)).map(u => u.id)
+      filtered = filtered.filter(e => validUserIds.includes(e.user_id))
+    }
+
     if (selectedUsers.length > 0) {
       filtered = filtered.filter(e => selectedUsers.includes(e.user_id))
     }
@@ -227,9 +248,16 @@ export default function ReportsPage() {
       const cId = e.projects?.client_id || 'personal'
       const passClient = selectedClients.includes(cId)
       const passProject = selectedProjects.length === 0 || selectedProjects.includes(e.project_id)
+      
+      let passGroup = true
+      if (selectedGroups.length > 0) {
+        const userObj = team.find(u => u.id === e.user_id)
+        passGroup = !!userObj?.group_id && selectedGroups.includes(userObj.group_id)
+      }
+
       const passUser = selectedUsers.length === 0 || selectedUsers.includes(e.user_id)
 
-      if (passClient && passProject && passUser) {
+      if (passClient && passProject && passGroup && passUser) {
         let mins = differenceInMinutes(parseISO(e.end_time!), parseISO(e.start_time))
         if (mins < 0) mins += 1440
         const duration = mins / 60
@@ -446,6 +474,7 @@ export default function ReportsPage() {
 
   const clientOptions = [...clients.map(c => ({ id: c.id, name: c.name })), { id: 'personal', name: 'Personal Projects' }]
   const visibleProjects = projects.filter(p => selectedClients.includes(p.client_id || 'personal'))
+  const visibleUsers = selectedGroups.length > 0 ? team.filter(u => u.group_id && selectedGroups.includes(u.group_id)) : team
 
   // Edit entries
   const openEditModal = (entry: TimeEntry) => {
@@ -613,7 +642,7 @@ export default function ReportsPage() {
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
         
         <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
@@ -690,6 +719,36 @@ export default function ReportsPage() {
           )}
         </div>
 
+        {/* Filter by Group */}
+        <div className="relative" ref={groupDropdownRef}>
+          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Group</label>
+          <div 
+            onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)}
+            className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
+          >
+            <span className="truncate">
+              {selectedGroups.length === 0 ? 'All Groups' : `${selectedGroups.length} Selected`}
+            </span>
+            <ChevronDown size={14} className="text-zinc-500 shrink-0" />
+          </div>
+
+          {isGroupDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-[250px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0 md:left-0">
+              {groups.map(g => (
+                <label key={g.id} className="flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedGroups.includes(g.id)}
+                    onChange={() => toggleGroup(g.id)}
+                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-zinc-900"
+                  />
+                  <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{g.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Filter by User */}
         <div className="relative" ref={userDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by User</label>
@@ -704,8 +763,8 @@ export default function ReportsPage() {
           </div>
 
           {isUserDropdownOpen && (
-            <div className="absolute z-10 mt-1 w-[250px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0 md:left-0">
-              {team.map(u => (
+            <div className="absolute z-10 mt-1 w-[250px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0">
+              {visibleUsers.map(u => (
                 <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -716,6 +775,9 @@ export default function ReportsPage() {
                   <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{u.full_name}</span>
                 </label>
               ))}
+              {visibleUsers.length === 0 && (
+                <div className="p-2 text-sm text-zinc-500 text-center">No users in selected groups</div>
+              )}
             </div>
           )}
         </div>
