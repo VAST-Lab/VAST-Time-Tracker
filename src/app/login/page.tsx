@@ -63,7 +63,7 @@ function LoginContent() {
         {isSignUp && (
           <input 
             type="text" 
-            placeholder="Full Name" 
+            placeholder="Name" 
             value={fullName} 
             onChange={e => setFullName(e.target.value)} 
             required 

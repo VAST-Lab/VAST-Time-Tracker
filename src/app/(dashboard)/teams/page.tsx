@@ -323,7 +323,7 @@ export default function TeamsPage() {
             ) : (
               <form onSubmit={handleMemberSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Full Name</label>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
                   <input type="text" required value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex justify-between mt-6">
