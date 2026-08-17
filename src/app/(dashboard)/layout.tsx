@@ -14,7 +14,7 @@ const navItems = [
   { name: 'Time Logs', href: '/', icon: Clock },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Reports', href: '/reports', icon: BarChart },
-  { name: 'Projects', href: '/projects', icon: Folder, adminOnly: true },
+  { name: 'Projects', href: '/projects', icon: Folder },
   { name: 'Teams', href: '/teams', icon: Users, adminOnly: true },
   { name: 'Clients', href: '/clients', icon: Briefcase, adminOnly: true },
 ]

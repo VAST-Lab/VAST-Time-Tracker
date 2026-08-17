@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { getProjects, createProject, updateProject, deleteProject, getClients } from '@/utils/supabase/api'
 import { Project, Client } from '@/types/supabase'
 import { useAdmin } from '@/hooks/useAdmin'
+import { useAuth } from '@/context/AuthContext'
 
 export default function ProjectsPage() {
+  const { user } = useAuth()
   const isAdmin = useAdmin()
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -28,15 +30,26 @@ export default function ProjectsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.client_id) return
-    await createProject(formData)
+    if (!formData.name || !user) return
+    // If not admin, force it to be a personal project
+    const isPersonal = !isAdmin || formData.client_id === 'personal'
+    
+    await createProject({
+      name: formData.name,
+      client_id: isPersonal ? null : formData.client_id,
+      user_id: isPersonal ? user.id : null,
+      color_hex: formData.color_hex
+    })
     setFormData({ name: '', client_id: '', color_hex: '#FF5733' })
     loadData()
   }
 
   const openEditModal = (project: Project) => {
+    // Prevent non-admins from editing shared projects
+    if (!isAdmin && project.client_id) return
+
     setEditName(project.name)
-    setEditClientId(project.client_id)
+    setEditClientId(project.user_id ? 'personal' : (project.client_id || ''))
     setEditColor(project.color_hex)
     setEditIsActive(project.is_active)
     setEditingProject(project)
@@ -44,8 +57,16 @@ export default function ProjectsPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingProject) return
-    await updateProject(editingProject.id, { name: editName, client_id: editClientId, color_hex: editColor, is_active: editIsActive })
+    if (!editingProject || !user) return
+    const isPersonal = !isAdmin || editClientId === 'personal'
+
+    await updateProject(editingProject.id, { 
+      name: editName, 
+      client_id: isPersonal ? null : editClientId, 
+      user_id: isPersonal ? user.id : null,
+      color_hex: editColor, 
+      is_active: editIsActive 
+    })
     setEditingProject(null)
     loadData()
   }
@@ -57,8 +78,7 @@ export default function ProjectsPage() {
     loadData()
   }
 
-  if (isAdmin === null) return <div>Loading...</div>
-  if (!isAdmin) return <div>Access Denied. Administrators only.</div>
+  if (isAdmin === null) return <div className="dark:text-zinc-100">Loading...</div>
 
   return (
     <div className="space-y-6">
@@ -69,19 +89,22 @@ export default function ProjectsPage() {
           type="text"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Project Name"
+          placeholder="New Project Name"
           className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100 min-w-[200px]"
           required
         />
-        <select 
-          value={formData.client_id}
-          onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-          className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
-          required
-        >
-          <option value="">Select Client...</option>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        {isAdmin && (
+          <select 
+            value={formData.client_id}
+            onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
+            required
+          >
+            <option value="">Select Client...</option>
+            <option value="personal">-- Personal Project --</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         <div className="flex items-center gap-2">
           <label className="text-sm text-zinc-600 dark:text-zinc-400">Color:</label>
           <input
@@ -96,44 +119,41 @@ export default function ProjectsPage() {
         </button>
       </form>
 
-      <div className="grid gap-4 md:hidden">
-        {projects.map(project => (
-          <div key={project.id} onClick={() => openEditModal(project)} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm flex items-center justify-between cursor-pointer">
-            <div>
-              <div className="font-medium text-zinc-900 dark:text-zinc-100">{project.name}</div>
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">{project.clients?.name}</div>
-            </div>
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: project.color_hex }} />
-          </div>
-        ))}
-      </div>
-
       <div className="hidden md:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-medium">
             <tr>
               <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Project</th>
-              <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Client</th>
+              <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Client / Type</th>
               <th className="px-6 py-4 text-zinc-900 dark:text-zinc-100">Color Tag</th>
               <th className="px-6 py-4 text-right text-zinc-900 dark:text-zinc-100">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {projects.map((project) => (
-              <tr key={project.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">{project.name}</td>
-                <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400">{project.clients?.name}</td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700" style={{ backgroundColor: project.color_hex }} />
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase">{project.color_hex}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button onClick={() => openEditModal(project)} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Edit</button>
-                </td>
-              </tr>
-            ))}
+            {projects.map((project) => {
+              const canEdit = isAdmin || project.user_id === user?.id;
+              return (
+                <tr key={project.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                  <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">{project.name}</td>
+                  <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400">
+                    {project.user_id ? <span className="text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider">Personal</span> : project.clients?.name}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700" style={{ backgroundColor: project.color_hex }} />
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase">{project.color_hex}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {canEdit ? (
+                      <button onClick={() => openEditModal(project)} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Edit</button>
+                    ) : (
+                      <span className="text-sm text-zinc-400 dark:text-zinc-600">Read Only</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -147,13 +167,15 @@ export default function ProjectsPage() {
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
                 <input type="text" required value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Client</label>
-                <select required value={editClientId} onChange={(e) => setEditClientId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
-                  <option value="">Select Client...</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Client</label>
+                  <select required value={editClientId} onChange={(e) => setEditClientId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
+                    <option value="personal">-- Personal Project --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Color:</label>
                 <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} className="h-9 w-9 rounded cursor-pointer border-0 p-0 bg-transparent" />

@@ -38,7 +38,8 @@ export interface Client {
 
 export interface Project {
   id: string;
-  client_id: string;
+  client_id: string | null;
+  user_id: string | null;
   name: string;
   color_hex: string;
   is_active: boolean;

@@ -52,14 +52,19 @@ export async function deleteClient(id: string): Promise<void> {
 
 // --- PROJECTS API ---
 export async function getProjects(): Promise<Project[]> {
-  const { isAdmin, group_id, allowedClientIds } = await getUserAccess();
-  if (!isAdmin && !group_id) return [];
+  const { data: { user } } = await supabase.auth.getUser();
+  const { isAdmin, allowedClientIds } = await getUserAccess();
 
   const { data, error } = await supabase.from('projects').select('*, clients(*)').order('name');
   if (error) throw error;
 
   const projects = (data as Project[]) || [];
-  if (!isAdmin) return projects.filter(p => allowedClientIds.includes(p.client_id));
+  if (!isAdmin) {
+    return projects.filter(p => 
+      (p.client_id && allowedClientIds.includes(p.client_id)) || 
+      p.user_id === user?.id
+    );
+  }
   return projects;
 }
 
