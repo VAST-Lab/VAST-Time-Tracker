@@ -41,13 +41,8 @@ export async function stopTimer(entryId: string): Promise<TimeEntry> {
   return data;
 }
 
-export async function addManualEntry(entry: { user_id: string; project_id: string; start_time: string; end_time: string; description: string }): Promise<TimeEntry> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .insert([entry])
-    .select()
-    .single();
-    
+export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'projects' | 'profiles'>): Promise<TimeEntry> {
+  const { data, error } = await supabase.from('time_entries').insert([entry]).select().single();
   if (error) throw error;
   return data;
 }
@@ -55,29 +50,27 @@ export async function addManualEntry(entry: { user_id: string; project_id: strin
 export async function getMyRecentEntries(userId: string): Promise<TimeEntry[]> {
   const { data, error } = await supabase
     .from('time_entries')
-    .select('*, projects(*)')
+    .select('*, projects(*, clients(*))')
     .eq('user_id', userId)
-    .not('end_time', 'is', null)
     .order('start_time', { ascending: false })
-    .limit(50);
-    
+    .limit(100);
+  
   if (error) throw error;
-  return (data as TimeEntry[]) || [];
+  return data || [];
 }
 
 export async function updateTimeEntry(id: string, updates: Partial<TimeEntry>): Promise<TimeEntry> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-    
+  const { data, error } = await supabase.from('time_entries').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function deleteTimeEntry(id: string): Promise<void> {
   const { error } = await supabase.from('time_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function bulkInsertTimeEntries(entries: Omit<TimeEntry, 'id' | 'projects' | 'profiles'>[]): Promise<void> {
+  const { error } = await supabase.from('time_entries').insert(entries);
   if (error) throw error;
 }
