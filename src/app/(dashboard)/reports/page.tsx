@@ -6,6 +6,7 @@ import { bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown, Upload, X } from 'lucide-react'
+import DateRangePicker from '@/components/DateRangePicker'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
 
@@ -402,20 +403,21 @@ export default function ReportsPage() {
 
       {/* FILTERS */}
       <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <div>
-          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Start Date</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">End Date</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+        
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
+          <DateRangePicker 
+            startDate={startDate} 
+            endDate={endDate} 
+            onChange={(s, e) => { setStartDate(s); setEndDate(e); }} 
+          />
         </div>
         
         <div className="relative" ref={dropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Project</label>
           <div 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
+            className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
           >
             <span className="truncate">
               {selectedProjects.length === 0 ? 'All Projects' : `${selectedProjects.length} Selected`}
@@ -445,7 +447,7 @@ export default function ReportsPage() {
 
         <div>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by User</label>
-          <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+          <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
             <option value="">All Team Members</option>
             {team.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
           </select>
