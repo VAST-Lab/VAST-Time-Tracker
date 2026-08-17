@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, getTeamMembers } from '@/utils/supabase/api'
 import { Project, Profile, TimeEntry } from '@/types/supabase'
-import { format, subDays, differenceInMinutes, parseISO } from 'date-fns'
+import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown } from 'lucide-react'
 
 type ReportUser = {
@@ -109,9 +109,74 @@ export default function ReportsPage() {
     return report
   }, [entries, selectedProjects, selectedUser])
 
+  const formatMins = (mins: number) => {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return `${h}h ${m}m`
+  }
+
   const formatHours = (mins: number) => {
     return `${(mins / 60).toFixed(1)}h`
   }
+
+  const processedData = useMemo(() => {
+    let filtered = entries
+
+    if (selectedProjects.length > 0) {
+      filtered = filtered.filter(e => selectedProjects.includes(e.project_id))
+    }
+    if (selectedUser) {
+      filtered = filtered.filter(e => e.user_id === selectedUser)
+    }
+
+    const pSummary = new Map<string, { name: string, color: string, mins: number }>()
+    const uSummary = new Map<string, { name: string, mins: number }>()
+    const wGroups = new Map<string, { startDate: Date, mins: number, entries: TimeEntry[] }>()
+
+    filtered.forEach(entry => {
+      const mins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time))
+      const pId = entry.project_id
+      const uId = entry.user_id
+
+      // Aggregate Project Summary
+      if (!pSummary.has(pId)) {
+        pSummary.set(pId, { name: entry.projects?.name || 'Unknown', color: entry.projects?.color_hex || '#ccc', mins: 0 })
+      }
+      pSummary.get(pId)!.mins += mins
+
+      // Aggregate User Summary
+      if (!uSummary.has(uId)) {
+        uSummary.set(uId, { name: entry.profiles?.full_name || 'Unknown User', mins: 0 })
+      }
+      uSummary.get(uId)!.mins += mins
+
+      // Aggregate Weekly Groups
+      const start = parseISO(entry.start_time)
+      const wStart = startOfWeek(start, { weekStartsOn: 1 })
+      const wEnd = endOfWeek(start, { weekStartsOn: 1 })
+      const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`
+
+      if (!wGroups.has(weekLabel)) {
+        wGroups.set(weekLabel, { startDate: wStart, mins: 0, entries: [] })
+      }
+      const wData = wGroups.get(weekLabel)!
+      wData.mins += mins
+      wData.entries.push(entry)
+    })
+
+    return {
+      projectSummaries: Array.from(pSummary.values()).sort((a, b) => b.mins - a.mins),
+      userSummaries: Array.from(uSummary.values()).sort((a, b) => b.mins - a.mins),
+      weeklyData: Array.from(wGroups.entries())
+        .map(([label, data]) => ({
+          label,
+          startDate: data.startDate,
+          mins: data.mins,
+          entries: data.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+        }))
+        .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
+    }
+  }, [entries, selectedProjects, selectedUser])
 
   const handleExportCSV = () => {
     // Basic CSV export
@@ -163,7 +228,6 @@ export default function ReportsPage() {
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
         </div>
         
-        {/* Custom Multi-Select Dropdown for Projects */}
         <div className="relative" ref={dropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Project</label>
           <div 
@@ -205,43 +269,77 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-zinc-500 dark:text-zinc-400">Loading report...</div>
-        ) : entries.length === 0 ? (
-          <div className="p-8 text-center text-zinc-500 dark:text-zinc-400">No completed time entries found for these filters.</div>
-        ) : (
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {Object.values(aggregatedData).map((project, idx) => (
-              <div key={idx} className="p-0">
-                <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
-                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{project.projectName}</h3>
+      {isLoading ? (
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400 shadow-sm">
+          Loading report...
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400 shadow-sm">
+          No completed time entries found for these filters.
+        </div>
+      ) : (
+        <>
+          {/* Summaries Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Project Summary</h3>
+              </div>
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-64 overflow-y-auto">
+                {processedData.projectSummaries.map((proj, idx) => (
+                  <li key={idx} className="px-6 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 truncate pr-4">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                      <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{proj.name}</span>
+                    </div>
+                    <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(proj.mins)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">User Summary</h3>
+              </div>
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-64 overflow-y-auto">
+                {processedData.userSummaries.map((user, idx) => (
+                  <li key={idx} className="px-6 py-3 flex items-center justify-between">
+                    <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate pr-4">{user.name}</span>
+                    <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(user.mins)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Detailed Entries Section */}
+          <div className="space-y-6">
+            {processedData.weeklyData.map((week, wIdx) => (
+              <div key={wIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+                <div className="bg-zinc-50 dark:bg-zinc-950 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                  <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">{week.label}</h3>
+                  <span className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatMins(week.mins)}</span>
                 </div>
+                
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {Object.values(project.users).map((user, uIdx) => (
-                    <div key={uIdx} className="px-6 py-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{user.userName}</span>
-                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                          {formatHours(user.totalMinutes)}
-                        </span>
+                  {week.entries.map(entry => (
+                    <div key={entry.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-6 py-4 items-center hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                      <div className="md:col-span-2 font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                        {entry.profiles?.full_name}
                       </div>
-                      
-                      {/* Individual Entries List */}
-                      <div className="space-y-2">
-                        {user.entries.map((entry) => (
-                          <div key={entry.id} className="flex justify-between items-center text-sm pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
-                            <div className="flex flex-col">
-                              <span className="text-zinc-800 dark:text-zinc-200">{entry.description || 'No description'}</span>
-                              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                                {format(parseISO(entry.start_time), 'MMM d, h:mm a')} - {format(parseISO(entry.end_time!), 'h:mm a')}
-                              </span>
-                            </div>
-                            <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
-                              {formatHours(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)))}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="md:col-span-4 text-sm text-zinc-700 dark:text-zinc-300 truncate">
+                        {entry.description || '-'}
+                      </div>
+                      <div className="md:col-span-2 flex items-center gap-2 overflow-hidden">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
+                        <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate uppercase tracking-wider">{entry.projects?.name}</span>
+                      </div>
+                      <div className="md:col-span-3 text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
+                        {format(parseISO(entry.start_time), 'MMM d, h:mm a')} <span className="mx-1 text-zinc-300 dark:text-zinc-700">-</span> {format(parseISO(entry.end_time!), 'h:mm a')}
+                      </div>
+                      <div className="md:col-span-1 text-left md:text-right font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                        {formatMins(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)))}
                       </div>
                     </div>
                   ))}
@@ -249,8 +347,8 @@ export default function ReportsPage() {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }
