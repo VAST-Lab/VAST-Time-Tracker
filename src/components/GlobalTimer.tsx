@@ -187,7 +187,7 @@ export default function GlobalTimer() {
         onChange={handleProjectChange}
         className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 text-zinc-900 dark:text-zinc-100 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900"
       >
-        <option value="">Project (Optional)</option>
+        <option value="">Project</option>
         {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
 
