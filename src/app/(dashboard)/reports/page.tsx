@@ -5,7 +5,7 @@ import { getProjects, getTeamMembers, getClients, createProject } from '@/utils/
 import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
-import { Download, ChevronDown, Upload, X, Edit2 } from 'lucide-react'
+import { Download, ChevronDown, Upload, X, Edit2, Trash2 } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
 import DateRangePicker from '@/components/DateRangePicker'
@@ -82,6 +82,12 @@ export default function ReportsPage() {
   
   const [userMapping, setUserMapping] = useState<Record<string, string>>({})
   const [projectMapping, setProjectMapping] = useState<Record<string, string>>({})
+
+  // Cleanup Modal States
+  const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false)
+  const [cleanupDate, setCleanupDate] = useState('')
+  const [cleanupUserId, setCleanupUserId] = useState('')
+  const [isCleaning, setIsCleaning] = useState(false)
 
   // Inline Create Project States
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false)
@@ -163,7 +169,9 @@ export default function ReportsPage() {
     const wGroups = new Map<string, { startDate: Date, mins: number, entries: TimeEntry[] }>()
 
     filtered.forEach(entry => {
-      const mins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time))
+      let mins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time))
+      if (mins < 0) mins += 1440 // Fallback for legacy negative logs
+
       const pId = entry.project_id
       const uId = entry.user_id
 
@@ -222,7 +230,10 @@ export default function ReportsPage() {
       const passUser = selectedUsers.length === 0 || selectedUsers.includes(e.user_id)
 
       if (passClient && passProject && passUser) {
-        const duration = differenceInMinutes(parseISO(e.end_time!), parseISO(e.start_time)) / 60
+        let mins = differenceInMinutes(parseISO(e.end_time!), parseISO(e.start_time))
+        if (mins < 0) mins += 1440
+        const duration = mins / 60
+        
         const date = format(parseISO(e.start_time), 'yyyy-MM-dd')
         const start = format(parseISO(e.start_time), 'HH:mm')
         const end = format(parseISO(e.end_time!), 'HH:mm')
@@ -276,7 +287,11 @@ export default function ReportsPage() {
 
     const initialProjectMap: Record<string, string> = {}
     uniqueProjects.forEach(cp => {
-      const match = projects.find(p => p.name.toLowerCase() === cp.toLowerCase())
+      const lowerCp = cp.toLowerCase()
+      let match = projects.find(p => p.name.toLowerCase() === lowerCp)
+      if (!match) {
+        match = projects.find(p => p.name.toLowerCase().includes(lowerCp) || lowerCp.includes(p.name.toLowerCase()))
+      }
       if (match) initialProjectMap[cp] = match.id
     })
 
@@ -321,8 +336,7 @@ export default function ReportsPage() {
           return alert(`Invalid date/time format for row: ${dateVal} ${endVal}`)
         }
         
-        // Handle midnight crossover
-        if (endVal < startVal) {
+        if (parsedEnd < parsedStart) {
           parsedEnd.setDate(parsedEnd.getDate() + 1)
         }
         endIso = parsedEnd.toISOString()
@@ -352,12 +366,24 @@ export default function ReportsPage() {
       if (fetchErr) throw fetchErr
 
       const newEntries = toInsert.filter(newItem => {
-        return !existingData?.some(existing => 
-          existing.user_id === newItem.user_id &&
-          existing.project_id === newItem.project_id &&
-          existing.start_time === newItem.start_time &&
-          existing.end_time === newItem.end_time
-        )
+        return !existingData?.some(existing => {
+          const isSameUser = existing.user_id === newItem.user_id
+          const isSameProject = existing.project_id === newItem.project_id
+          
+          // Compare exact numeric time values, as ISO string formatting (milliseconds, Z vs +00:00) can differ between JS and the DB
+          const existingStart = new Date(existing.start_time).getTime()
+          const newStart = new Date(newItem.start_time).getTime()
+          const isSameStart = existingStart === newStart
+
+          let isSameEnd = false
+          if (!existing.end_time && !newItem.end_time) {
+            isSameEnd = true
+          } else if (existing.end_time && newItem.end_time) {
+            isSameEnd = new Date(existing.end_time).getTime() === new Date(newItem.end_time).getTime()
+          }
+
+          return isSameUser && isSameProject && isSameStart && isSameEnd
+        })
       })
 
       if (newEntries.length === 0) {
@@ -464,19 +490,116 @@ export default function ReportsPage() {
     loadReport()
   }
 
+  // --- CLEANUP LOGIC ---
+  const handleCleanupDuplicates = async () => {
+    if (!confirm("Are you sure you want to scan for and delete all duplicate time entries? This cannot be undone.")) return
+    setIsCleaning(true)
+    try {
+      const { data: allEntries, error } = await supabase
+        .from('time_entries')
+        .select('id, user_id, project_id, start_time, end_time')
+
+      if (error) throw error
+
+      const seen = new Set<string>()
+      const duplicateIds: string[] = []
+
+      for (const e of allEntries || []) {
+        const startMs = new Date(e.start_time).getTime()
+        const endMs = e.end_time ? new Date(e.end_time).getTime() : 'null'
+        const key = `${e.user_id}|${e.project_id}|${startMs}|${endMs}`
+
+        if (seen.has(key)) {
+          duplicateIds.push(e.id)
+        } else {
+          seen.add(key)
+        }
+      }
+
+      if (duplicateIds.length === 0) {
+        alert("No duplicates found!")
+      } else {
+        // Chunk deletions if there are too many to avoid URI too long errors
+        const chunkSize = 500
+        for (let i = 0; i < duplicateIds.length; i += chunkSize) {
+          const chunk = duplicateIds.slice(i, i + chunkSize)
+          await supabase.from('time_entries').delete().in('id', chunk)
+        }
+        alert(`Successfully removed ${duplicateIds.length} duplicate entries!`)
+        loadReport()
+      }
+    } catch (error: any) {
+      alert(`Failed to clean duplicates: ${error.message}`)
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
+  const handleCleanupByDate = async () => {
+    if (!cleanupDate) return
+    if (!confirm(`Are you sure you want to delete ALL time entries before ${cleanupDate}? This cannot be undone.`)) return
+    setIsCleaning(true)
+    try {
+      const { error } = await supabase
+        .from('time_entries')
+        .delete()
+        .lt('start_time', `${cleanupDate}T00:00:00.000Z`)
+
+      if (error) throw error
+      alert(`Successfully deleted entries before ${cleanupDate}!`)
+      setCleanupDate('')
+      loadReport()
+    } catch (error: any) {
+      alert(`Failed to delete old entries: ${error.message}`)
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
+  const handleCleanupByUser = async () => {
+    if (!cleanupUserId) return
+    const userToDelete = team.find(t => t.id === cleanupUserId)
+    if (!confirm(`Are you sure you want to delete ALL time entries for ${userToDelete?.full_name}? This cannot be undone.`)) return
+    setIsCleaning(true)
+    try {
+      const { error } = await supabase
+        .from('time_entries')
+        .delete()
+        .eq('user_id', cleanupUserId)
+
+      if (error) throw error
+      alert(`Successfully deleted all entries for ${userToDelete?.full_name}!`)
+      setCleanupUserId('')
+      loadReport()
+    } catch (error: any) {
+      alert(`Failed to delete user entries: ${error.message}`)
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4">
         <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Reports</h1>
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           {isAdmin && (
-            <button 
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 md:px-4 py-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs md:text-sm font-medium"
-            >
-              <Upload size={16} />
-              Import Data
-            </button>
+            <>
+              <button 
+                onClick={() => setIsCleanupModalOpen(true)}
+                className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-3 md:px-4 py-2 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-medium"
+              >
+                <Trash2 size={16} />
+                Cleanup
+              </button>
+              <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 md:px-4 py-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs md:text-sm font-medium"
+              >
+                <Upload size={16} />
+                Import Data
+              </button>
+            </>
           )}
           <button 
             onClick={handleExportCSV}
@@ -654,7 +777,10 @@ export default function ReportsPage() {
                 
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {week.entries.map(entry => {
-                    const duration = formatMins(differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time)));
+                    let itemMins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time));
+                    if (itemMins < 0) itemMins += 1440;
+                    
+                    const duration = formatMins(itemMins);
                     const canEdit = entry.user_id === user?.id;
                     const canDelete = canEdit || isAdmin;
 
@@ -909,6 +1035,81 @@ export default function ReportsPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLEANUP MODAL */}
+      {isCleanupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800 flex flex-col">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <h2 className="text-xl font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                <Trash2 size={20} />
+                Data Cleanup
+              </h2>
+              <button onClick={() => setIsCleanupModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={20} /></button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Duplicates */}
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-1">Remove Duplicates</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Scans the entire database for entries with the exact same user, project, start time, and end time, and deletes the extras.</p>
+                <button 
+                  onClick={handleCleanupDuplicates}
+                  disabled={isCleaning}
+                  className="w-full px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-md text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {isCleaning ? 'Processing...' : 'Find & Delete Duplicates'}
+                </button>
+              </div>
+
+              {/* By Date */}
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-1">Purge Old Logs</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Permanently delete all time entries logged before a specific date.</p>
+                <div className="flex gap-2">
+                  <input 
+                    type="date" 
+                    value={cleanupDate} 
+                    onChange={e => setCleanupDate(e.target.value)} 
+                    className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+                  />
+                  <button 
+                    onClick={handleCleanupByDate}
+                    disabled={!cleanupDate || isCleaning}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 shrink-0"
+                  >
+                    Delete Logs
+                  </button>
+                </div>
+              </div>
+
+              {/* By User */}
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-1">Purge By User</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Permanently delete all time entries belonging to a specific user.</p>
+                <div className="flex gap-2">
+                  <select 
+                    value={cleanupUserId} 
+                    onChange={e => setCleanupUserId(e.target.value)} 
+                    className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="">Select User...</option>
+                    {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                  </select>
+                  <button 
+                    onClick={handleCleanupByUser}
+                    disabled={!cleanupUserId || isCleaning}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 shrink-0"
+                  >
+                    Delete Logs
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
