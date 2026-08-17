@@ -6,9 +6,9 @@ import { bulkInsertTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client } from '@/types/supabase'
 import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { Download, ChevronDown, Upload, X } from 'lucide-react'
-import DateRangePicker from '@/components/DateRangePicker'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
+import DateRangePicker from '@/components/DateRangePicker'
 
 type ReportUser = {
   userName: string;
@@ -49,11 +49,19 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   
+  // Filter States
+  const [selectedClients, setSelectedClients] = useState<string[]>([])
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+  const clientDropdownRef = useRef<HTMLDivElement>(null)
+
   const [selectedProjects, setSelectedProjects] = useState<string[]>([])
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false)
+  const projectDropdownRef = useRef<HTMLDivElement>(null)
   
-  const [selectedUser, setSelectedUser] = useState('')
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
+  const userDropdownRef = useRef<HTMLDivElement>(null)
+
   const [isLoading, setIsLoading] = useState(true)
 
   // Import Modal States
@@ -79,12 +87,21 @@ export default function ReportsPage() {
     Promise.all([getProjects(), getTeamMembers(), getClients()]).then(([p, t, c]) => {
       setProjects(p)
       setTeam(t)
-      setClients(c.filter(client => client.is_active))
+      const activeClients = c.filter(client => client.is_active)
+      setClients(activeClients)
+      // Default to all actual clients, explicitly excluding 'personal'
+      setSelectedClients(activeClients.map(client => client.id))
     })
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false)
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false)
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target as Node)) {
+        setIsProjectDropdownOpen(false)
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
+        setIsUserDropdownOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -108,20 +125,30 @@ export default function ReportsPage() {
     setIsLoading(false)
   }
 
-  const toggleProject = (projectId: string) => {
-    setSelectedProjects(prev => 
-      prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]
-    )
+  const toggleClient = (id: string) => {
+    setSelectedClients(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  const toggleProject = (id: string) => {
+    setSelectedProjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  const toggleUser = (id: string) => {
+    setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   const processedData = useMemo(() => {
     let filtered = entries
 
+    // Filter by Client
+    filtered = filtered.filter(e => {
+      const cId = e.projects?.client_id || 'personal'
+      return selectedClients.includes(cId)
+    })
+
     if (selectedProjects.length > 0) {
       filtered = filtered.filter(e => selectedProjects.includes(e.project_id))
     }
-    if (selectedUser) {
-      filtered = filtered.filter(e => e.user_id === selectedUser)
+    if (selectedUsers.length > 0) {
+      filtered = filtered.filter(e => selectedUsers.includes(e.user_id))
     }
 
     const pSummary = new Map<string, { name: string, color: string, mins: number }>()
@@ -168,7 +195,7 @@ export default function ReportsPage() {
         }))
         .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
     }
-  }, [entries, selectedProjects, selectedUser])
+  }, [entries, selectedClients, selectedProjects, selectedUsers])
 
   const formatHours = (mins: number) => {
     return `${(mins / 60).toFixed(1)}h`
@@ -182,9 +209,12 @@ export default function ReportsPage() {
   const handleExportCSV = () => {
     let csv = 'Project,Description,Client,User,Date,Start Time,End Time,Duration (h)\n'
     entries.forEach(e => {
-      if ((selectedProjects.length === 0 || selectedProjects.includes(e.project_id)) && 
-          (!selectedUser || e.user_id === selectedUser)) {
-        
+      const cId = e.projects?.client_id || 'personal'
+      const passClient = selectedClients.includes(cId)
+      const passProject = selectedProjects.length === 0 || selectedProjects.includes(e.project_id)
+      const passUser = selectedUsers.length === 0 || selectedUsers.includes(e.user_id)
+
+      if (passClient && passProject && passUser) {
         const duration = differenceInMinutes(parseISO(e.end_time!), parseISO(e.start_time)) / 60
         const date = format(parseISO(e.start_time), 'yyyy-MM-dd')
         const start = format(parseISO(e.start_time), 'HH:mm')
@@ -207,6 +237,7 @@ export default function ReportsPage() {
     a.click()
   }
 
+  // --- IMPORT LOGIC ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -376,6 +407,9 @@ export default function ReportsPage() {
     return userMapping[r[uIdx]] && projectMapping[r[pIdx]]
   }).length
 
+  const clientOptions = [...clients.map(c => ({ id: c.id, name: c.name })), { id: 'personal', name: 'Personal Projects' }]
+  const visibleProjects = projects.filter(p => selectedClients.includes(p.client_id || 'personal'))
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-4">
@@ -402,7 +436,7 @@ export default function ReportsPage() {
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
         
         <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
@@ -412,22 +446,53 @@ export default function ReportsPage() {
             onChange={(s, e) => { setStartDate(s); setEndDate(e); }} 
           />
         </div>
-        
-        <div className="relative" ref={dropdownRef}>
+
+        {/* Filter by Client */}
+        <div className="relative" ref={clientDropdownRef}>
+          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Client</label>
+          <div 
+            onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+            className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
+          >
+            <span className="truncate">
+              {selectedClients.length === clientOptions.length ? 'All Clients' : `${selectedClients.length} Selected`}
+            </span>
+            <ChevronDown size={14} className="text-zinc-500 shrink-0" />
+          </div>
+          
+          {isClientDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-[250px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0 md:left-0">
+              {clientOptions.map(c => (
+                <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedClients.includes(c.id)}
+                    onChange={() => toggleClient(c.id)}
+                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-zinc-900"
+                  />
+                  <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Filter by Project */}
+        <div className="relative" ref={projectDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Project</label>
           <div 
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
             className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
           >
             <span className="truncate">
               {selectedProjects.length === 0 ? 'All Projects' : `${selectedProjects.length} Selected`}
             </span>
-            <ChevronDown size={14} className="text-zinc-500" />
+            <ChevronDown size={14} className="text-zinc-500 shrink-0" />
           </div>
           
-          {isDropdownOpen && (
-            <div className="absolute z-10 mt-1 w-[350px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2">
-              {projects.map(p => (
+          {isProjectDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-[350px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0 md:left-0">
+              {visibleProjects.map(p => (
                 <label key={p.id} className="flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -441,17 +506,43 @@ export default function ReportsPage() {
                   </div>
                 </label>
               ))}
+              {visibleProjects.length === 0 && (
+                <div className="p-2 text-sm text-zinc-500 text-center">No projects in selected clients</div>
+              )}
             </div>
           )}
         </div>
 
-        <div>
+        {/* Filter by User */}
+        <div className="relative" ref={userDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by User</label>
-          <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-            <option value="">All Team Members</option>
-            {team.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-          </select>
+          <div 
+            onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+            className="w-full h-10 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer flex justify-between items-center"
+          >
+            <span className="truncate">
+              {selectedUsers.length === 0 ? 'All Team Members' : `${selectedUsers.length} Selected`}
+            </span>
+            <ChevronDown size={14} className="text-zinc-500 shrink-0" />
+          </div>
+
+          {isUserDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-[250px] max-h-60 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 right-0 md:left-0">
+              {team.map(u => (
+                <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedUsers.includes(u.id)}
+                    onChange={() => toggleUser(u.id)}
+                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-zinc-900"
+                  />
+                  <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{u.full_name}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
+
       </div>
 
       {isLoading ? (
