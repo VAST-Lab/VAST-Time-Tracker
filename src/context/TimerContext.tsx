@@ -1,47 +1,54 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { supabase } from '@/utils/supabase/client'
 import { useAuth } from './AuthContext'
-import { getActiveTimer, startTimer, stopTimer } from '@/utils/supabase/timeApi'
 import { TimeEntry } from '@/types/supabase'
+import { addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 
 type TimerContextType = {
   activeEntry: TimeEntry | null;
   elapsedSeconds: number;
-  handleStart: (projectId: string, description: string) => Promise<void>;
-  handleStop: () => Promise<void>;
-  refreshTrigger: number; // Used to trigger re-renders on the dashboard
+  refreshTrigger: number;
+  triggerRefresh: () => void;
+  handleStart: (projectId?: string | null, description?: string) => Promise<void>;
+  handleStop: (projectId?: string) => Promise<void>;
+  handleDiscard: () => Promise<void>;
 }
 
-const TimerContext = createContext<TimerContextType>({
-  activeEntry: null,
-  elapsedSeconds: 0,
-  handleStart: async () => {},
-  handleStop: async () => {},
-  refreshTrigger: 0
-})
+const TimerContext = createContext<TimerContextType | undefined>(undefined)
 
-export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
+export function TimerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
+  const triggerRefresh = () => setRefreshTrigger(prev => prev + 1)
+
   useEffect(() => {
     if (!user) return
     const fetchActive = async () => {
-      const entry = await getActiveTimer(user.id)
-      setActiveEntry(entry)
+      const { data } = await supabase
+        .from('time_entries')
+        .select('*, projects(*, clients(*))')
+        .eq('user_id', user.id)
+        .is('end_time', null)
+        .order('start_time', { ascending: false })
+        .limit(1)
+        .single()
+      
+      setActiveEntry(data || null)
     }
     fetchActive()
-  }, [user])
+  }, [user, refreshTrigger])
 
   useEffect(() => {
     let interval: NodeJS.Timeout
     if (activeEntry) {
+      const start = new Date(activeEntry.start_time).getTime()
+      setElapsedSeconds(Math.floor((Date.now() - start) / 1000))
       interval = setInterval(() => {
-        const start = new Date(activeEntry.start_time).getTime()
-        const now = new Date().getTime()
-        setElapsedSeconds(Math.floor((now - start) / 1000))
+        setElapsedSeconds(Math.floor((Date.now() - start) / 1000))
       }, 1000)
     } else {
       setElapsedSeconds(0)
@@ -49,24 +56,46 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(interval)
   }, [activeEntry])
 
-  const handleStart = async (projectId: string, description: string) => {
+  const handleStart = async (projectId?: string | null, description?: string) => {
     if (!user) return
-    const entry = await startTimer(user.id, projectId, description)
-    setActiveEntry(entry)
+    if (activeEntry) await handleStop()
+    
+    await addManualEntry({
+      user_id: user.id,
+      project_id: projectId || null as any,
+      description: description || '',
+      start_time: new Date().toISOString(),
+      end_time: null
+    })
+    triggerRefresh()
   }
 
-  const handleStop = async () => {
+  const handleStop = async (enforcedProjectId?: string) => {
     if (!activeEntry) return
-    await stopTimer(activeEntry.id)
-    setActiveEntry(null)
-    setRefreshTrigger(prev => prev + 1)
+    const finalProjectId = enforcedProjectId || activeEntry.project_id
+    
+    await updateTimeEntry(activeEntry.id, { 
+      end_time: new Date().toISOString(),
+      project_id: finalProjectId 
+    })
+    triggerRefresh()
+  }
+
+  const handleDiscard = async () => {
+    if (!activeEntry) return
+    await deleteTimeEntry(activeEntry.id)
+    triggerRefresh()
   }
 
   return (
-    <TimerContext.Provider value={{ activeEntry, elapsedSeconds, handleStart, handleStop, refreshTrigger }}>
+    <TimerContext.Provider value={{ activeEntry, elapsedSeconds, refreshTrigger, triggerRefresh, handleStart, handleStop, handleDiscard }}>
       {children}
     </TimerContext.Provider>
   )
 }
 
-export const useTimer = () => useContext(TimerContext)
+export const useTimer = () => {
+  const context = useContext(TimerContext)
+  if (context === undefined) throw new Error('useTimer must be used within a TimerProvider')
+  return context
+}

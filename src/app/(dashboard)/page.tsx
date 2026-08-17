@@ -3,22 +3,17 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
-import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
+import { getMyRecentEntries, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
+import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek, differenceInSeconds } from 'date-fns'
+import { Play } from 'lucide-react'
 
-export default function TimeLogsPage() {
+export default function DashboardPage() {
   const { user } = useAuth()
-  const { refreshTrigger } = useTimer()
+  const { activeEntry, handleStart, handleStop, handleDiscard, refreshTrigger, triggerRefresh } = useTimer()
   const [projects, setProjects] = useState<Project[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
   
-  const [projectId, setProjectId] = useState('')
-  const [description, setDescription] = useState('')
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('17:00')
-
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [editProjectId, setEditProjectId] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -31,37 +26,59 @@ export default function TimeLogsPage() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      loadEntries()
-    }
+    if (user) loadEntries()
   }, [user, refreshTrigger])
 
   const loadEntries = () => {
     if (user) getMyRecentEntries(user.id).then(setEntries)
   }
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user || !projectId) return
-
-    const startIso = new Date(`${date}T${startTime}`).toISOString()
-    const endIso = new Date(`${date}T${endTime}`).toISOString()
-
-    await addManualEntry({
-      user_id: user.id,
-      project_id: projectId,
-      description,
-      start_time: startIso,
-      end_time: endIso
+  // --- QUICK START LOGIC ---
+  const quickStarts = useMemo(() => {
+    const qsMap = new Map<string, { project_id: string, description: string, project: any, count: number, last_used: number }>()
+    
+    entries.forEach(e => {
+      if (!e.project_id) return // Don't suggest items without projects
+      const key = `${e.project_id}|${e.description || ''}`
+      if (!qsMap.has(key)) {
+        qsMap.set(key, { 
+          project_id: e.project_id, 
+          project: e.projects, 
+          description: e.description || '', 
+          count: 0, 
+          last_used: new Date(e.start_time).getTime() 
+        })
+      }
+      qsMap.get(key)!.count++
     })
 
-    setDescription('')
-    loadEntries()
+    return Array.from(qsMap.values())
+      .sort((a, b) => b.count - a.count || b.last_used - a.last_used)
+      .slice(0, 8)
+  }, [entries])
+
+  const handleQuickStartPlay = async (qs: any) => {
+    if (activeEntry) {
+      const durationSecs = differenceInSeconds(new Date(), new Date(activeEntry.start_time))
+      
+      if (durationSecs < 30) {
+        await handleDiscard()
+      } else {
+        if (!activeEntry.project_id) {
+          alert("Please assign a project to your currently running timer before switching.")
+          return
+        }
+        await handleStop(activeEntry.project_id)
+      }
+    }
+    // Start the new one
+    await handleStart(qs.project_id, qs.description)
   }
 
+  // --- EDIT MODAL LOGIC ---
   const openEditModal = (entry: TimeEntry) => {
     const start = parseISO(entry.start_time)
-    setEditProjectId(entry.project_id)
+    setEditProjectId(entry.project_id || '')
     setEditDescription(entry.description || '')
     setEditDate(format(start, 'yyyy-MM-dd'))
     setEditStartTime(format(start, 'HH:mm'))
@@ -77,23 +94,24 @@ export default function TimeLogsPage() {
     const endIso = editEndTime ? new Date(`${editDate}T${editEndTime}`).toISOString() : null
 
     await updateTimeEntry(editingEntry.id, {
-      project_id: editProjectId,
+      project_id: editProjectId || null as any,
       description: editDescription,
       start_time: startIso,
       end_time: endIso
     })
 
     setEditingEntry(null)
-    loadEntries()
+    triggerRefresh()
   }
 
   const handleDelete = async () => {
     if (!editingEntry) return
     await deleteTimeEntry(editingEntry.id)
     setEditingEntry(null)
-    loadEntries()
+    triggerRefresh()
   }
 
+  // --- FORMATTING LOGIC ---
   const formatDuration = (start: string, end: string | null) => {
     if (!end) return 'Running...'
     const mins = differenceInMinutes(new Date(end), new Date(start))
@@ -108,7 +126,6 @@ export default function TimeLogsPage() {
     return `${h}h ${m}m`
   }
 
-  // Group entries by Week and then by Day
   const groupedData = useMemo(() => {
     const groups = new Map<string, { startDate: Date, weekTotal: number, days: Map<string, { date: Date, dayTotal: number, entries: TimeEntry[] }> }>();
 
@@ -119,7 +136,7 @@ export default function TimeLogsPage() {
       const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`;
       const dayLabel = format(start, 'EEEE, MMM d');
       
-      const mins = entry.end_time ? differenceInMinutes(new Date(entry.end_time), start) : differenceInMinutes(new Date(), start);
+      const mins = entry.end_time ? differenceInMinutes(new Date(entry.end_time), start) : Math.max(0, differenceInMinutes(new Date(), start));
 
       if (!groups.has(weekLabel)) {
         groups.set(weekLabel, { startDate: wStart, weekTotal: 0, days: new Map() });
@@ -155,46 +172,46 @@ export default function TimeLogsPage() {
 
   return (
     <div className="space-y-6 md:space-y-8 max-w-7xl">
+      
+      {/* QUICK START SECTION */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-4 md:mb-6">Time Logs</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-4 md:mb-6">Quick Start</h1>
         
-        <div className="bg-white dark:bg-zinc-900 p-4 md:p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <h2 className="text-base md:text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Manual Entry</h2>
-          <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-end">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Project</label>
-              <select required value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-                <option value="">Select...</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Description</label>
-              <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date</label>
-              <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-            </div>
-            <div className="md:col-span-2 flex gap-2">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Start</label>
-                <input type="time" required value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+        {quickStarts.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400 shadow-sm">
+            Track some time to see your frequent projects appear here!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {quickStarts.map((qs, idx) => (
+              <div 
+                key={idx} 
+                className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors group"
+              >
+                <div className="mb-4">
+                  <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm md:text-base line-clamp-2 mb-1 leading-snug">
+                    {qs.description || 'No Description'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: qs.project?.color_hex || '#ccc' }} />
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{qs.project?.name}</span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => handleQuickStartPlay(qs)}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm font-medium transition-colors border border-zinc-200 dark:border-zinc-700"
+                >
+                  <Play size={14} className="group-hover:text-zinc-900 dark:group-hover:text-zinc-100" />
+                  Start Timer
+                </button>
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">End</label>
-                <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-              </div>
-            </div>
-            <div className="md:col-span-7 flex justify-end mt-2 md:mt-0">
-              <button type="submit" className="w-full md:w-auto bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-6 py-2 rounded-md hover:bg-zinc-800 dark:hover:bg-white text-sm font-medium">
-                Add Time
-              </button>
-            </div>
-          </form>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* RECENT LOGS SECTION */}
       <div>
         <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
         
@@ -223,8 +240,8 @@ export default function TimeLogsPage() {
                           <div className="flex items-center gap-3 overflow-hidden">
                             <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
                             <div className="min-w-0">
-                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm truncate">{entry.projects?.name}</div>
-                              <div className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 truncate">{entry.description || 'No description'}</div>
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm truncate">{entry.description || 'No description'}</div>
+                              <div className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 truncate">{entry.projects?.name || 'No Project'}</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
@@ -246,8 +263,9 @@ export default function TimeLogsPage() {
         )}
       </div>
 
+      {/* EDIT MODAL */}
       {editingEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Time Log</h2>
             <form onSubmit={handleEditSubmit} className="space-y-4">
