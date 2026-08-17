@@ -149,9 +149,10 @@ export default function GlobalTimer() {
   return (
     <div className={`flex items-center gap-1 md:gap-2 ${activeEntry ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm'} border px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`} ref={suggestionsRef}>
       
-      <div className="flex-1 relative min-w-0">
+      <div className="flex-1 relative min-w-0 flex items-center">
         <input
           type="text"
+          maxLength={80}
           placeholder="What are you working on?"
           value={description}
           onChange={(e) => { setDescription(e.target.value); setShowSuggestions(true); }}
@@ -160,6 +161,11 @@ export default function GlobalTimer() {
           className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
         />
         
+        {description.length >= 50 && (
+          <span className="absolute right-0 -top-6 text-[10px] text-red-500 font-medium bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded shadow-sm border border-red-200 dark:border-red-900 z-10">
+            {description.length}/80
+          </span>
+        )}
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 mt-2 w-[150%] md:w-[200%] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50">
             {suggestions.map((s, idx) => (
