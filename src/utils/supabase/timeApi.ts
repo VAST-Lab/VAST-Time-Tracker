@@ -42,7 +42,8 @@ export async function stopTimer(entryId: string): Promise<TimeEntry> {
 }
 
 export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'projects' | 'profiles'>): Promise<TimeEntry> {
-  const { data, error } = await supabase.from('time_entries').insert([entry]).select().single();
+  const payload = { is_tentative: false, ...entry };
+  const { data, error } = await supabase.from('time_entries').insert([payload]).select().single();
   if (error) throw error;
   return data;
 }

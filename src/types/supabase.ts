@@ -53,6 +53,7 @@ export interface TimeEntry {
   start_time: string;
   end_time: string | null;
   description: string | null;
+  is_tentative?: boolean;
   projects?: Project; 
   profiles?: Profile; 
 }

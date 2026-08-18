@@ -3,10 +3,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
-import { getMyRecentEntries, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
+import { getMyRecentEntries, updateTimeEntry, deleteTimeEntry, addManualEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek, differenceInSeconds } from 'date-fns'
-import { Play } from 'lucide-react'
+import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek, differenceInSeconds, startOfHour, addHours } from 'date-fns'
+import { Play, Plus } from 'lucide-react'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -14,12 +14,22 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
   
+  // Create Manual Modal
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false)
+  const [manualProjectId, setManualProjectId] = useState('')
+  const [manualDesc, setManualDesc] = useState('')
+  const [manualDate, setManualDate] = useState('')
+  const [manualStartTime, setManualStartTime] = useState('')
+  const [manualEndTime, setManualEndTime] = useState('')
+  const [manualIsTentative, setManualIsTentative] = useState(false)
+
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [editProjectId, setEditProjectId] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editDate, setEditDate] = useState('')
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
+  const [editIsTentative, setEditIsTentative] = useState(false)
 
   useEffect(() => {
     getProjects().then(setProjects)
@@ -76,38 +86,65 @@ export default function DashboardPage() {
   }
 
   // --- EDIT MODAL LOGIC ---
+  const openManualModal = () => {
+    const nowRounded = startOfHour(new Date())
+    const later = addHours(nowRounded, 1)
+    setManualDate(format(nowRounded, 'yyyy-MM-dd'))
+    setManualStartTime(format(nowRounded, 'HH:mm'))
+    setManualEndTime(format(later, 'HH:mm'))
+    setManualProjectId('')
+    setManualDesc('')
+    setManualIsTentative(false)
+    setIsManualModalOpen(true)
+  }
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user || !manualProjectId) return
+    const startIso = new Date(`${manualDate}T${manualStartTime}`).toISOString()
+    const endDateObj = new Date(`${manualDate}T${manualEndTime}`)
+    if (manualEndTime < manualStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
+
+    await addManualEntry({
+      user_id: user.id,
+      project_id: manualProjectId,
+      description: manualDesc,
+      start_time: startIso,
+      end_time: endDateObj.toISOString(),
+      is_tentative: manualIsTentative
+    })
+    setIsManualModalOpen(false)
+    triggerRefresh()
+  }
+
   const openEditModal = (entry: TimeEntry) => {
     const start = parseISO(entry.start_time)
     setEditProjectId(entry.project_id || '')
     setEditDescription(entry.description || '')
+    setEditIsTentative(entry.is_tentative || false)
     setEditDate(format(start, 'yyyy-MM-dd'))
     setEditStartTime(format(start, 'HH:mm'))
     setEditEndTime(entry.end_time ? format(parseISO(entry.end_time), 'HH:mm') : '')
     setEditingEntry(entry)
   }
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEditSubmit = async (e: React.FormEvent, forceTentativeValue?: boolean) => {
+    e?.preventDefault()
     if (!editingEntry) return
-
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
-    
     let endIso = null
     if (editEndTime) {
       const endDateObj = new Date(`${editDate}T${editEndTime}`)
-      if (editEndTime < editStartTime) {
-        endDateObj.setDate(endDateObj.getDate() + 1)
-      }
+      if (editEndTime < editStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
       endIso = endDateObj.toISOString()
     }
-
     await updateTimeEntry(editingEntry.id, {
       project_id: editProjectId || null as any,
       description: editDescription,
       start_time: startIso,
-      end_time: endIso
+      end_time: endIso,
+      is_tentative: forceTentativeValue !== undefined ? forceTentativeValue : editIsTentative
     })
-
     setEditingEntry(null)
     triggerRefresh()
   }
@@ -137,7 +174,13 @@ export default function DashboardPage() {
   }
 
   const groupedData = useMemo(() => {
-    const groups = new Map<string, { startDate: Date, weekTotal: number, days: Map<string, { date: Date, dayTotal: number, entries: TimeEntry[] }> }>();
+    const groups = new Map<string, { 
+      startDate: Date, 
+      totalMins: number,
+      forecastedMins: number,
+      personalMins: number,
+      days: Map<string, { date: Date, totalMins: number, forecastedMins: number, personalMins: number, entries: TimeEntry[] }> 
+    }>();
 
     entries.forEach(entry => {
       const start = new Date(entry.start_time);
@@ -147,19 +190,33 @@ export default function DashboardPage() {
       const dayLabel = format(start, 'EEEE, MMM d');
       
       const mins = entry.end_time ? differenceInMinutes(new Date(entry.end_time), start) : Math.max(0, differenceInMinutes(new Date(), start));
+      
+      const isPersonal = !!entry.projects?.user_id;
+      const isTentative = !!entry.is_tentative;
 
       if (!groups.has(weekLabel)) {
-        groups.set(weekLabel, { startDate: wStart, weekTotal: 0, days: new Map() });
+        groups.set(weekLabel, { startDate: wStart, totalMins: 0, forecastedMins: 0, personalMins: 0, days: new Map() });
       }
       
       const weekData = groups.get(weekLabel)!;
       if (!weekData.days.has(dayLabel)) {
-        weekData.days.set(dayLabel, { date: start, dayTotal: 0, entries: [] });
+        weekData.days.set(dayLabel, { date: start, totalMins: 0, forecastedMins: 0, personalMins: 0, entries: [] });
       }
       
       const dayData = weekData.days.get(dayLabel)!;
-      weekData.weekTotal += mins;
-      dayData.dayTotal += mins;
+      
+      if (isPersonal) {
+        weekData.personalMins += mins;
+        dayData.personalMins += mins;
+      } else {
+        weekData.forecastedMins += mins;
+        dayData.forecastedMins += mins;
+        if (!isTentative) {
+          weekData.totalMins += mins;
+          dayData.totalMins += mins;
+        }
+      }
+      
       dayData.entries.push(entry);
     });
 
@@ -167,12 +224,16 @@ export default function DashboardPage() {
       .map(([label, data]) => ({
         label,
         startDate: data.startDate,
-        weekTotal: data.weekTotal,
+        totalMins: data.totalMins,
+        forecastedMins: data.forecastedMins,
+        personalMins: data.personalMins,
         days: Array.from(data.days.entries())
           .map(([dLabel, dData]) => ({
             label: dLabel,
             date: dData.date,
-            dayTotal: dData.dayTotal,
+            totalMins: dData.totalMins,
+            forecastedMins: dData.forecastedMins,
+            personalMins: dData.personalMins,
             entries: dData.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
           }))
           .sort((a, b) => b.date.getTime() - a.date.getTime())
@@ -223,7 +284,12 @@ export default function DashboardPage() {
 
       {/* RECENT LOGS SECTION */}
       <div>
-        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
+        <div className="flex justify-between items-center mb-3 md:mb-4">
+          <h2 className="text-base md:text-lg font-semibold text-zinc-800 dark:text-zinc-200">Recent Logs</h2>
+          <button onClick={openManualModal} className="flex items-center gap-2 text-sm font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-3 py-1.5 rounded-md hover:bg-zinc-800 dark:hover:bg-white transition-colors">
+            <Plus size={16} /> Add Manual Time
+          </button>
+        </div>
         
         {groupedData.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
@@ -232,25 +298,35 @@ export default function DashboardPage() {
         ) : (
           groupedData.map((week, wIdx) => (
             <div key={wIdx} className="mb-6 md:mb-8">
-              <div className="flex justify-between items-center mb-3 md:mb-4 text-xs md:text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 md:mb-4 text-xs md:text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider gap-1">
                 <span>{week.label}</span>
-                <span>{formatMins(week.weekTotal)}</span>
+                <div className="normal-case tracking-normal text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatMins(week.totalMins)}</span>
+                  {week.totalMins !== week.forecastedMins && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatMins(week.forecastedMins)})</span>}
+                  {week.personalMins > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatMins(week.personalMins)}</span>}
+                </div>
               </div>
               
               <div className="space-y-3 md:space-y-4">
                 {week.days.map((day, dIdx) => (
                   <div key={dIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-3 md:px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-3 md:px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                       <span className="text-xs md:text-sm font-medium text-zinc-700 dark:text-zinc-300">{day.label}</span>
-                      <span className="text-xs md:text-sm font-mono text-zinc-600 dark:text-zinc-400">{formatMins(day.dayTotal)}</span>
+                      <div className="text-xs md:text-sm font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatMins(day.totalMins)}</span>
+                        {day.totalMins !== day.forecastedMins && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatMins(day.forecastedMins)})</span>}
+                        {day.personalMins > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatMins(day.personalMins)}</span>}
+                      </div>
                     </div>
                     <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {day.entries.map(entry => (
-                        <div key={entry.id} onClick={() => openEditModal(entry)} className="p-3 md:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer gap-2 sm:gap-4">
+                        <div key={entry.id} onClick={() => openEditModal(entry)} className={`p-3 md:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer gap-2 sm:gap-4 ${entry.is_tentative ? 'opacity-70 border-l-2 border-dashed border-zinc-400' : ''}`}>
                           <div className="flex items-center gap-3 overflow-hidden">
                             <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.projects?.color_hex || '#ccc' }} />
                             <div className="min-w-0">
-                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm truncate">{entry.description || 'No description'}</div>
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs md:text-sm truncate">
+                                {entry.description || 'No description'} {entry.is_tentative && <span className="ml-1 text-[10px] text-zinc-500 font-semibold">(Tentative)</span>}
+                              </div>
                               <div className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 truncate">{entry.projects?.name || 'No Project'}</div>
                             </div>
                           </div>
@@ -272,6 +348,42 @@ export default function DashboardPage() {
           ))
         )}
       </div>
+
+      {/* ADD MANUAL MODAL */}
+      {isManualModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Log Time Block</h2>
+            <form onSubmit={handleManualSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select required value={manualProjectId} onChange={(e) => setManualProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                  <option value="">Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <input type="text" placeholder="Description" maxLength={80} value={manualDesc} onChange={(e) => setManualDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+              </div>
+              <div>
+                <input type="date" required value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+              </div>
+              <div className="flex gap-4">
+                <input type="time" required value={manualStartTime} onChange={(e) => setManualStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <input type="time" value={manualEndTime} onChange={(e) => setManualEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="dashManualTentative" checked={manualIsTentative} onChange={(e) => setManualIsTentative(e.target.checked)} className="rounded border-zinc-300" />
+                <label htmlFor="dashManualTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setIsManualModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* EDIT MODAL */}
       {editingEntry && (
@@ -307,9 +419,16 @@ export default function DashboardPage() {
                   <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
                 </div>
               </div>
-              <div className="flex justify-between mt-6">
+              <div className="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="dashEditTentative" checked={editIsTentative} onChange={(e) => setEditIsTentative(e.target.checked)} className="rounded border-zinc-300" />
+                <label htmlFor="dashEditTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
+              </div>
+              <div className="flex justify-between mt-6 items-center">
                 <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete</button>
                 <div className="space-x-3">
+                  <button type="button" onClick={(e) => handleEditSubmit(e, !editIsTentative)} className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md">
+                    {editIsTentative ? 'Confirm Time' : 'Make Tentative'}
+                  </button>
                   <button type="button" onClick={() => setEditingEntry(null)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
                   <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save</button>
                 </div>

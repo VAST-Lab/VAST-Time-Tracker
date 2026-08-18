@@ -10,11 +10,12 @@ import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes } from 'date-fns'
+import { format, differenceInMinutes, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
-  const { projectName, description, durationStr, colorHex, isActive } = event.extendedProps;
+  const { projectName, description, durationStr, colorHex, isActive, isTentative } = event.extendedProps;
   
   const start = event.start;
   const end = event.end || new Date();
@@ -23,11 +24,14 @@ function renderEventContent(eventInfo: EventContentArg) {
   
   return (
     <div 
-      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden border-l-4 bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
-      style={{ borderLeftColor: colorHex }}
+      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
+      style={{ 
+        borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
+        opacity: isTentative ? 0.7 : 1
+      }}
     >
       <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
-        {projectName}
+        {projectName} {isTentative && '(Tentative)'}
       </div>
       
       {!isShort && description && (
@@ -57,13 +61,21 @@ export default function CalendarPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())
   
-  // Create Modal State
+  // Custom Header States
+  const calendarRef = useRef<any>(null)
+  const [currentView, setCurrentView] = useState('timeGridWeek')
+  const [currentDate, setCurrentDate] = useState(startOfToday())
+  const [calendarTitle, setCalendarTitle] = useState('')
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalProjectId, setModalProjectId] = useState('')
   const [modalDesc, setModalDesc] = useState('')
   const [modalDate, setModalDate] = useState('')
   const [modalStartTime, setModalStartTime] = useState('')
   const [modalEndTime, setModalEndTime] = useState('')
+  const [modalIsTentative, setModalIsTentative] = useState(false)
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -73,6 +85,7 @@ export default function CalendarPage() {
   const [editDate, setEditDate] = useState('')
   const [editStartTime, setEditStartTime] = useState('')
   const [editEndTime, setEditEndTime] = useState('')
+  const [editIsTentative, setEditIsTentative] = useState(false)
 
   // Tick the current time every minute for the active timer block
   useEffect(() => {
@@ -103,7 +116,9 @@ export default function CalendarPage() {
         description: entry.description,
         colorHex: entry.projects?.color_hex || '#3788d8',
         durationStr: getExactDuration(entry.start_time, entry.end_time || new Date()),
-        isActive: false
+        isActive: false,
+        isTentative: entry.is_tentative || false,
+        isPersonal: !!entry.projects?.user_id
       }
     }))
     setDbEvents(mappedEvents)
@@ -125,7 +140,9 @@ export default function CalendarPage() {
           description: activeEntry.description,
           colorHex: activeEntry.projects?.color_hex || '#3788d8',
           durationStr: getExactDuration(activeEntry.start_time, currentTime),
-          isActive: true
+          isActive: true,
+          isTentative: false,
+          isPersonal: !!activeEntry.projects?.user_id
         }
       })
       return filtered
@@ -142,6 +159,37 @@ export default function CalendarPage() {
     if (mins < 0) mins += 24 * 60 // Handle midnight crossover
     return `${Math.floor(mins / 60)}h ${mins % 60}m`
   }
+
+  // Calculate Totals based on visible events
+  const totals = useMemo(() => {
+    let totalMins = 0;
+    let forecastedMins = 0;
+    let personalMins = 0;
+
+    const startBound = currentView === 'timeGridWeek' ? startOfWeek(currentDate) : currentDate;
+    const endBound = currentView === 'timeGridWeek' ? addWeeks(startBound, 1) : new Date(currentDate.getTime() + 86400000);
+
+    calendarEvents.forEach(e => {
+      const eStart = new Date(e.start);
+      if (eStart >= startBound && eStart < endBound) {
+        const mins = differenceInMinutes(new Date(e.end), eStart);
+        if (e.extendedProps.isPersonal) {
+          personalMins += mins;
+        } else {
+          forecastedMins += mins;
+          if (!e.extendedProps.isTentative) totalMins += mins;
+        }
+      }
+    });
+
+    const fTotal = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`;
+    return {
+      total: fTotal(totalMins),
+      forecasted: fTotal(forecastedMins),
+      personal: personalMins > 0 ? fTotal(personalMins) : null,
+      showForecasted: totalMins !== forecastedMins
+    };
+  }, [calendarEvents, currentView, currentDate]);
 
   const handleEventDrop = async (dropInfo: EventDropArg) => {
     const { event } = dropInfo
@@ -174,6 +222,7 @@ export default function CalendarPage() {
     setModalDate(format(selectInfo.start, 'yyyy-MM-dd'))
     setModalStartTime(format(selectInfo.start, 'HH:mm'))
     setModalEndTime(format(selectInfo.end, 'HH:mm'))
+    setModalIsTentative(false)
     setIsModalOpen(true)
     selectInfo.view.calendar.unselect() 
   }
@@ -184,6 +233,7 @@ export default function CalendarPage() {
     setEditId(event.id)
     setEditProjectId(event.extendedProps.projectId)
     setEditDesc(event.extendedProps.description || '')
+    setEditIsTentative(event.extendedProps.isTentative)
     if (event.start) {
       setEditDate(format(event.start, 'yyyy-MM-dd'))
       setEditStartTime(format(event.start, 'HH:mm'))
@@ -196,19 +246,16 @@ export default function CalendarPage() {
     e.preventDefault()
     if (!user || !modalProjectId) return
     const startIso = new Date(`${modalDate}T${modalStartTime}`).toISOString()
-    
     const endDateObj = new Date(`${modalDate}T${modalEndTime}`)
-    if (modalEndTime < modalStartTime) {
-      endDateObj.setDate(endDateObj.getDate() + 1)
-    }
-    const endIso = endDateObj.toISOString()
+    if (modalEndTime < modalStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
 
     await addManualEntry({
       user_id: user.id,
       project_id: modalProjectId,
       description: modalDesc,
       start_time: startIso,
-      end_time: endIso
+      end_time: endDateObj.toISOString(),
+      is_tentative: modalIsTentative
     })
 
     setIsModalOpen(false)
@@ -217,17 +264,14 @@ export default function CalendarPage() {
     loadCalendarData()
   }
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEditSubmit = async (e: React.FormEvent, forceTentativeValue?: boolean) => {
+    e?.preventDefault()
     if (!editId) return
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
-    
     let endIso = null
     if (editEndTime) {
       const endDateObj = new Date(`${editDate}T${editEndTime}`)
-      if (editEndTime < editStartTime) {
-        endDateObj.setDate(endDateObj.getDate() + 1)
-      }
+      if (editEndTime < editStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
       endIso = endDateObj.toISOString()
     }
 
@@ -235,7 +279,8 @@ export default function CalendarPage() {
       project_id: editProjectId,
       description: editDesc,
       start_time: startIso,
-      end_time: endIso
+      end_time: endIso,
+      is_tentative: forceTentativeValue !== undefined ? forceTentativeValue : editIsTentative
     })
 
     setIsEditModalOpen(false)
@@ -249,28 +294,55 @@ export default function CalendarPage() {
     loadCalendarData()
   }
 
-  const calendarRef = useRef<any>(null)
+  // Header Actions
+  const handleViewChange = (view: string) => {
+    setCurrentView(view)
+    calendarRef.current?.getApi().changeView(view)
+  }
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (calendarRef.current) {
-        const api = calendarRef.current.getApi()
-        const isMobile = window.innerWidth < 768
-        if (isMobile && api.view.type !== 'timeGridDay') {
-          api.changeView('timeGridDay')
-        } else if (!isMobile && api.view.type !== 'timeGridWeek') {
-          api.changeView('timeGridWeek')
-        }
-      }
+  const navigatePreset = (preset: string) => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    let date = new Date()
+    if (preset === 'This week' || preset === 'Today') date = new Date()
+    else if (preset === 'Last week') date = subWeeks(new Date(), 1)
+    else if (preset === '2 weeks ago') date = subWeeks(new Date(), 2)
+    else if (preset === 'Yesterday') date = subDays(new Date(), 1)
+    else if (preset.endsWith('days ago')) {
+      const days = parseInt(preset.split(' ')[0])
+      date = subDays(new Date(), days)
     }
-    // Delay slightly to ensure FullCalendar has initialized
-    const timeout = setTimeout(handleResize, 100)
-    window.addEventListener('resize', handleResize)
-    return () => {
-      clearTimeout(timeout)
-      window.removeEventListener('resize', handleResize)
+    
+    api.gotoDate(date)
+    setIsDropdownOpen(false)
+  }
+
+  const navigateArrow = (dir: 'prev' | 'next') => {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    api[dir]()
+  }
+
+  const getDropdownLabel = () => {
+    const today = startOfToday()
+    if (currentView === 'timeGridWeek') {
+      const diff = differenceInCalendarWeeks(today, currentDate, { weekStartsOn: 0 })
+      if (diff === 0) return 'This week'
+      if (diff === 1) return 'Last week'
+      if (diff === 2) return '2 weeks ago'
+      return `Week of ${format(startOfWeek(currentDate), 'MMM d')}`
+    } else {
+      const diff = differenceInCalendarDays(today, currentDate)
+      if (diff === 0) return 'Today'
+      if (diff === 1) return 'Yesterday'
+      if (diff > 1 && diff <= 7) return `${diff} days ago`
+      return format(currentDate, 'MMM d, yyyy')
     }
-  }, [])
+  }
+
+  const dropdownPresets = currentView === 'timeGridWeek' 
+    ? ['This week', 'Last week', '2 weeks ago']
+    : ['Today', 'Yesterday', '2 days ago', '3 days ago', '4 days ago', '5 days ago', '6 days ago', '7 days ago']
 
   return (
     <div className="h-full flex flex-col space-y-4">
@@ -279,28 +351,56 @@ export default function CalendarPage() {
           --fc-border-color: #27272a;
           --fc-today-bg-color: rgba(39, 39, 42, 0.5);
         }
-        :root {
-          --fc-now-indicator-color: #ef4444;
-        }
+        :root { --fc-now-indicator-color: #ef4444; }
         .fc-timegrid-event-harness > .fc-timegrid-event {
           background-color: transparent !important;
           border: none !important;
           box-shadow: none !important;
         }
-        /* Mobile adjustments for calendar header */
-        .fc .fc-toolbar.fc-header-toolbar {
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
-        }
-        @media (max-width: 768px) {
-          .fc .fc-toolbar-title { font-size: 1.125rem !important; }
-          .fc .fc-button { padding: 0.25rem 0.5rem !important; font-size: 0.875rem !important; }
-        }
       `}</style>
       
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100">Calendar</h1>
+      {/* CUSTOM HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-6 w-full md:w-auto">
+          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 shrink-0">
+            <button onClick={() => handleViewChange('timeGridWeek')} className={`px-3 py-1 text-sm font-medium rounded ${currentView === 'timeGridWeek' ? 'bg-white dark:bg-zinc-950 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}`}>Week</button>
+            <button onClick={() => handleViewChange('timeGridDay')} className={`px-3 py-1 text-sm font-medium rounded ${currentView === 'timeGridDay' ? 'bg-white dark:bg-zinc-950 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}`}>Day</button>
+          </div>
+          <div className="hidden md:block font-bold text-zinc-900 dark:text-zinc-100 text-lg">
+            {calendarTitle}
+          </div>
+        </div>
+        <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+            <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
+            {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
+            {totals.personal && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {totals.personal}</span>}
+          </div>
+          
+          <div className="relative">
+            <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800">
+              {getDropdownLabel()}
+              <ChevronDown size={16} />
+            </button>
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
+                {dropdownPresets.map(preset => (
+                  <button key={preset} onClick={() => navigatePreset(preset)} className="block w-full text-left px-4 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => navigateArrow('prev')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronLeft size={20} /></button>
+            <button onClick={() => navigateArrow('next')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronRight size={20} /></button>
+          </div>
+        </div>
+      </div>
+
+      <div className="md:hidden font-bold text-center text-zinc-900 dark:text-zinc-100 text-base">
+        {calendarTitle}
       </div>
       
       <div className="flex-1 bg-white dark:bg-zinc-900 p-2 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[500px] md:min-h-[600px] dark:text-zinc-100">
@@ -308,11 +408,7 @@ export default function CalendarPage() {
           ref={calendarRef}
           plugins={[timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'timeGridWeek,timeGridDay'
-          }}
+          headerToolbar={false}
           events={calendarEvents}
           eventContent={renderEventContent}
           editable={true}
@@ -324,6 +420,10 @@ export default function CalendarPage() {
           eventResize={handleEventResize}
           select={handleDateSelect}
           eventClick={handleEventClick}
+          datesSet={(arg) => {
+            setCalendarTitle(arg.view.title)
+            setCurrentDate(arg.view.currentStart)
+          }}
           height="100%"
           scrollTime="09:00:00"
         />
@@ -365,6 +465,10 @@ export default function CalendarPage() {
                 <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 text-right">
                   {calcDuration(modalStartTime, modalEndTime)}
                 </div>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="modalTentative" checked={modalIsTentative} onChange={(e) => setModalIsTentative(e.target.checked)} className="rounded border-zinc-300" />
+                <label htmlFor="modalTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
@@ -412,9 +516,18 @@ export default function CalendarPage() {
                   {calcDuration(editStartTime, editEndTime)}
                 </div>
               </div>
-              <div className="flex justify-between mt-6">
+              
+              <div className="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="editTentative" checked={editIsTentative} onChange={(e) => setEditIsTentative(e.target.checked)} className="rounded border-zinc-300" />
+                <label htmlFor="editTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
+              </div>
+
+              <div className="flex justify-between mt-6 items-center">
                 <button type="button" onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md">Delete</button>
                 <div className="space-x-3">
+                  <button type="button" onClick={(e) => handleEditSubmit(e, !editIsTentative)} className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md">
+                    {editIsTentative ? 'Confirm Time' : 'Make Tentative'}
+                  </button>
                   <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
                   <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save</button>
                 </div>

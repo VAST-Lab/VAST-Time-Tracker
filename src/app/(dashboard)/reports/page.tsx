@@ -172,7 +172,7 @@ export default function ReportsPage() {
   }
 
   const processedData = useMemo(() => {
-    let filtered = entries
+    let filtered = entries.filter(e => !e.is_tentative);
 
     // Filter by Client
     filtered = filtered.filter(e => {
