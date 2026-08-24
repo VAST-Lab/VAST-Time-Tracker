@@ -11,7 +11,7 @@ import { getProjects, getTeamMembers } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry, Profile } from '@/types/supabase'
 import { format, differenceInMinutes, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
@@ -65,6 +65,7 @@ export default function CalendarPage() {
   const [team, setTeam] = useState<Profile[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [zoomLevel, setZoomLevel] = useState(1.5)
 
   // Custom Header States
   const calendarRef = useRef<any>(null)
@@ -94,9 +95,18 @@ export default function CalendarPage() {
 
   // Tick the current time every minute for the active timer block
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-    return () => clearInterval(timer)
+	const timer = setInterval(() => setCurrentTime(new Date()), 60000)
+	return () => clearInterval(timer)
   }, [])
+
+  // Trigger resize on zoom so FullCalendar recalculates event heights
+  useEffect(() => {
+	if (calendarRef.current) {
+	  requestAnimationFrame(() => {
+		calendarRef.current?.getApi().updateSize()
+	  })
+	}
+  }, [zoomLevel])
 
   useEffect(() => {
 	if (user) {
@@ -369,6 +379,9 @@ export default function CalendarPage() {
           border: none !important;
           box-shadow: none !important;
         }
+        .fc-timegrid-slot {
+          height: calc(1.5em * ${zoomLevel}) !important;
+        }
       `}</style>
       
       {/* CUSTOM HEADER */}
@@ -384,14 +397,23 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
           {isAdmin && team.length > 0 && (
-          <select
-            value={selectedUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
-          >
-            {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-          </select>
+			<select
+			  value={selectedUserId}
+			  onChange={(e) => setSelectedUserId(e.target.value)}
+			  className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
+        >
+          {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+            </select>
           )}
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-md p-0.5 shrink-0">
+            <button onClick={() => setZoomLevel(z => Math.max(1, z - 0.25))} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 shadow-sm" title="Decrease row height">
+              <Minus size={14} />
+            </button>
+            <span className="text-[10px] md:text-xs font-mono w-8 md:w-10 text-center text-zinc-700 dark:text-zinc-300">{Math.round(zoomLevel * 100)}%</span>
+            <button onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 shadow-sm" title="Increase row height">
+              <Plus size={14} />
+            </button>
+          </div>
           <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
             {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
