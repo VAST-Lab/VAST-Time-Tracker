@@ -1149,7 +1149,7 @@ export default function ReportsPage() {
               <div>
               <div className="flex justify-between items-end mb-1">
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
-                  {editDescription.length >= 150 && <span className="text-[10px] text-red-500">{editDescription.length}/80</span>}
+                  {editDescription.length >= 150 && <span className="text-[10px] text-red-500">{editDescription.length}/500</span>}
                 </div>
                 <DescriptionAutocomplete
                   disabled={editingEntry.user_id !== user?.id}
@@ -1236,7 +1236,7 @@ export default function ReportsPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">New Description</label>
-                  {bulkEditDescription.length >= 150 && <span className="text-[10px] text-red-500">{bulkEditDescription.length}/80</span>}
+                  {bulkEditDescription.length >= 150 && <span className="text-[10px] text-red-500">{bulkEditDescription.length}/500</span>}
                 </div>
                 <DescriptionAutocomplete
                   value={bulkEditDescription}

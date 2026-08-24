@@ -163,7 +163,7 @@ export default function GlobalTimer() {
         
         {description.length >= 150 && (
           <span className="absolute right-0 -top-6 text-[10px] text-red-500 font-medium bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded shadow-sm border border-red-200 dark:border-red-900 z-10">
-            {description.length}/80
+            {description.length}/500
           </span>
         )}
         {showSuggestions && suggestions.length > 0 && (

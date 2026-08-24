@@ -466,7 +466,7 @@ export default function CalendarPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description (Optional)</label>
-                  {modalDesc.length >= 150 && <span className="text-[10px] text-red-500">{modalDesc.length}/80</span>}
+                  {modalDesc.length >= 150 && <span className="text-[10px] text-red-500">{modalDesc.length}/500</span>}
                 </div>
                 <DescriptionAutocomplete
                   value={modalDesc}
@@ -523,7 +523,7 @@ export default function CalendarPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
-                  {editDesc.length >= 150 && <span className="text-[10px] text-red-500">{editDesc.length}/80</span>}
+                  {editDesc.length >= 150 && <span className="text-[10px] text-red-500">{editDesc.length}/500</span>}
                 </div>
                 <DescriptionAutocomplete
                   value={editDesc}
