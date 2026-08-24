@@ -7,6 +7,7 @@ import { getMyRecentEntries, updateTimeEntry, deleteTimeEntry, addManualEntry } 
 import { Project, TimeEntry } from '@/types/supabase'
 import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek, differenceInSeconds, startOfHour, addHours } from 'date-fns'
 import { Play, Plus } from 'lucide-react'
+import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -363,7 +364,15 @@ export default function DashboardPage() {
                 </select>
               </div>
               <div>
-                <input type="text" placeholder="Description" maxLength={250} value={manualDesc} onChange={(e) => setManualDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <DescriptionAutocomplete
+                  placeholder="Description"
+                  value={manualDesc}
+                  onChange={(val, projId) => {
+                  setManualDesc(val);
+                  if (projId) setManualProjectId(projId);
+                  }}
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+                />
               </div>
               <div>
                 <input type="date" required value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
@@ -399,11 +408,18 @@ export default function DashboardPage() {
                 </select>
               </div>
               <div>
-                <div className="flex justify-between items-end mb-1">
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
+              <div className="flex justify-between items-end mb-1">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
                   {editDescription.length >= 120 && <span className="text-[10px] text-red-500">{editDescription.length}/80</span>}
                 </div>
-                <input type="text" maxLength={250} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <DescriptionAutocomplete
+                  value={editDescription}
+                  onChange={(val, projId) => {
+                  setEditDescription(val);
+                  if (projId) setEditProjectId(projId);
+                  }}
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>

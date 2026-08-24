@@ -60,12 +60,12 @@ export async function getProjects(): Promise<Project[]> {
 
   const projects = (data as Project[]) || [];
   if (!isAdmin) {
-    return projects.filter(p => 
-      (p.client_id && allowedClientIds.includes(p.client_id)) || 
-      p.user_id === user?.id
-    );
+	return projects.filter(p =>
+	  (p.client_id && allowedClientIds.includes(p.client_id)) ||
+	  p.user_id === user?.id
+	);
   }
-  return projects;
+  return projects.filter(p => !p.user_id || p.user_id === user?.id);
 }
 
 export async function createProject(project: Omit<Project, 'id' | 'is_active' | 'clients'>): Promise<Project> {

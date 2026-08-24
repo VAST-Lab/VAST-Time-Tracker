@@ -4,11 +4,12 @@ import { supabase } from '@/utils/supabase/client'
 import { getProjects, getTeamMembers, getClients, createProject, getGroups } from '@/utils/supabase/api'
 import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries, bulkUpdateTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client, Group } from '@/types/supabase'
-import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from 'date-fns'
+import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek, startOfToday } from 'date-fns'
 import { Download, ChevronDown, Upload, X, Edit2, Trash2 } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
 import DateRangePicker from '@/components/DateRangePicker'
+import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
 type ReportUser = {
   userName: string;
@@ -47,8 +48,8 @@ export default function ReportsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [startDate, setStartDate] = useState(format(startOfWeek(startOfToday()), 'yyyy-MM-dd'))
+  const [endDate, setEndDate] = useState(format(endOfWeek(startOfToday()), 'yyyy-MM-dd'))
   
   // Filter States
   const [selectedClients, setSelectedClients] = useState<string[]>([])
@@ -1146,11 +1147,19 @@ export default function ReportsPage() {
                 </select>
               </div>
               <div>
-                <div className="flex justify-between items-end mb-1">
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
+              <div className="flex justify-between items-end mb-1">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
                   {editDescription.length >= 120 && <span className="text-[10px] text-red-500">{editDescription.length}/80</span>}
                 </div>
-                <input disabled={editingEntry.user_id !== user?.id} type="text" maxLength={250} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                <DescriptionAutocomplete
+                  disabled={editingEntry.user_id !== user?.id}
+                  value={editDescription}
+                  onChange={(val, projId) => {
+                  setEditDescription(val);
+                  if (projId) setEditProjectId(projId);
+                  }}
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
@@ -1229,14 +1238,15 @@ export default function ReportsPage() {
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">New Description</label>
                   {bulkEditDescription.length >= 120 && <span className="text-[10px] text-red-500">{bulkEditDescription.length}/80</span>}
                 </div>
-                <input 
-                  type="text" 
-                  maxLength={250}
-                  value={bulkEditDescription} 
-                  onChange={(e) => setBulkEditDescription(e.target.value)} 
+                <DescriptionAutocomplete
+                  value={bulkEditDescription}
+                  onChange={(val, projId) => {
+                  setBulkEditDescription(val);
+                  if (projId) setBulkEditProjectId(projId);
+                  }}
                   disabled={bulkClearDescription}
                   placeholder="-- No Change --"
-                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" 
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50"
                 />
                 <label className="flex items-center gap-2 mt-2">
                   <input type="checkbox" checked={bulkClearDescription} onChange={e => setBulkClearDescription(e.target.checked)} className="rounded border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950" />

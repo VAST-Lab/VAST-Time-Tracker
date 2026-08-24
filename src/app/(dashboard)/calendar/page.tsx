@@ -7,11 +7,13 @@ import { EventDropArg, EventClickArg, DateSelectArg, EventContentArg } from '@fu
 import { EventResizeDoneArg } from '@fullcalendar/interaction'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
-import { getProjects } from '@/utils/supabase/api'
+import { getProjects, getTeamMembers } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
-import { Project, TimeEntry } from '@/types/supabase'
+import { Project, TimeEntry, Profile } from '@/types/supabase'
 import { format, differenceInMinutes, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useAdmin } from '@/hooks/useAdmin'
+import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
 function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
@@ -56,11 +58,14 @@ const getExactDuration = (start: string, end: string | Date) => {
 
 export default function CalendarPage() {
   const { user } = useAuth()
+  const isAdmin = useAdmin()
   const { activeEntry } = useTimer()
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [team, setTeam] = useState<Profile[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [currentTime, setCurrentTime] = useState(new Date())
-  
+
   // Custom Header States
   const calendarRef = useRef<any>(null)
   const [currentView, setCurrentView] = useState('timeGridWeek')
@@ -94,15 +99,22 @@ export default function CalendarPage() {
   }, [])
 
   useEffect(() => {
-    if (user) loadCalendarData()
-  }, [user])
+	if (user) {
+	  if (!selectedUserId) setSelectedUserId(user.id)
+	  loadCalendarData(selectedUserId || user.id)
+	}
+  }, [user, selectedUserId])
 
-  const loadCalendarData = async () => {
-    if (!user) return
-    const [projData, timeData] = await Promise.all([
-      getProjects(),
-      getMyRecentEntries(user.id)
-    ])
+  useEffect(() => {
+	if (isAdmin) getTeamMembers().then(setTeam)
+  }, [isAdmin])
+
+  const loadCalendarData = async (targetUserId: string) => {
+	if (!user) return
+	const [projData, timeData] = await Promise.all([
+	  getProjects(),
+	  getMyRecentEntries(targetUserId)
+	])
     
     setProjects(projData)
     
@@ -125,9 +137,9 @@ export default function CalendarPage() {
   }
 
   // Merge the active timer block with the saved logs
-  const calendarEvents = useMemo(() => {
-    const allEvents = [...dbEvents]
-    if (activeEntry) {
+ const calendarEvents = useMemo(() => {
+	const allEvents = [...dbEvents]
+	if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
       // Remove any overlapping saved entry for the active block before pushing the live one
       const filtered = allEvents.filter(e => e.id !== activeEntry.id)
       filtered.push({
@@ -249,24 +261,24 @@ export default function CalendarPage() {
     const endDateObj = new Date(`${modalDate}T${modalEndTime}`)
     if (modalEndTime < modalStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
 
-    await addManualEntry({
-      user_id: user.id,
+      await addManualEntry({
+      user_id: selectedUserId || user.id,
       project_id: modalProjectId,
       description: modalDesc,
       start_time: startIso,
       end_time: endDateObj.toISOString(),
       is_tentative: modalIsTentative
-    })
+	  })
 
-    setIsModalOpen(false)
-    setModalProjectId('')
-    setModalDesc('')
-    loadCalendarData()
-  }
+	  setIsModalOpen(false)
+	  setModalProjectId('')
+	  setModalDesc('')
+	  loadCalendarData(selectedUserId || user.id)
+	}
 
   const handleEditSubmit = async (e: React.FormEvent, forceTentativeValue?: boolean) => {
     e?.preventDefault()
-    if (!editId) return
+    if (!user || !editId) return
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
     let endIso = null
     if (editEndTime) {
@@ -281,17 +293,17 @@ export default function CalendarPage() {
       start_time: startIso,
       end_time: endIso,
       is_tentative: forceTentativeValue !== undefined ? forceTentativeValue : editIsTentative
-    })
+	  })
 
-    setIsEditModalOpen(false)
-    loadCalendarData()
-  }
+	  setIsEditModalOpen(false)
+	  loadCalendarData(selectedUserId || user.id)
+	}
 
   const handleDelete = async () => {
-    if (!editId) return
+    if (!user || !editId) return
     await deleteTimeEntry(editId)
     setIsEditModalOpen(false)
-    loadCalendarData()
+    loadCalendarData(selectedUserId || user.id)
   }
 
   // Header Actions
@@ -371,6 +383,15 @@ export default function CalendarPage() {
           </div>
         </div>
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          {isAdmin && team.length > 0 && (
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
+          >
+            {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+          </select>
+          )}
           <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
             {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
@@ -447,8 +468,15 @@ export default function CalendarPage() {
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description (Optional)</label>
                   {modalDesc.length >= 120 && <span className="text-[10px] text-red-500">{modalDesc.length}/80</span>}
                 </div>
-                <input type="text" maxLength={250} value={modalDesc} onChange={(e) => setModalDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
-              </div>
+                <DescriptionAutocomplete
+                  value={modalDesc}
+                  onChange={(val, projId) => {
+                  setModalDesc(val);
+                  if (projId) setModalProjectId(projId);
+                  }}
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
+                />
+                </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
                 <input type="date" required value={modalDate} onChange={(e) => setModalDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
@@ -497,7 +525,14 @@ export default function CalendarPage() {
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
                   {editDesc.length >= 120 && <span className="text-[10px] text-red-500">{editDesc.length}/80</span>}
                 </div>
-                <input type="text" maxLength={250} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+                <DescriptionAutocomplete
+                  value={editDesc}
+                  onChange={(val, projId) => {
+                  setEditDesc(val);
+                  if (projId) setEditProjectId(projId);
+                  }}
+                  className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
