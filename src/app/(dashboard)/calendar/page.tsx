@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { EventDropArg, EventClickArg, DateSelectArg, EventContentArg } from '@fullcalendar/core'
+import { EventDropArg, EventClickArg, DateSelectArg, EventContentArg, DayHeaderContentArg } from '@fullcalendar/core'
 import { EventResizeDoneArg } from '@fullcalendar/interaction'
 import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
@@ -18,34 +18,44 @@ import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
   const { projectName, description, durationStr, colorHex, isActive, isTentative } = event.extendedProps;
-  
+
   const start = event.start;
   const end = event.end || new Date();
   const durationMins = start ? differenceInMinutes(end, start) : 60;
   const isShort = durationMins <= 45;
-  
+
+  const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
+  const tooltipText = `${description ? description + ' - ' : ''}${projectName} ${durationStr} ${timeRangeStr}`;
+
   return (
-    <div 
-      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
-      style={{ 
-        borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
-        opacity: isTentative ? 0.7 : 1
-      }}
-    >
-      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
-        {projectName} {isTentative && '(Tentative)'}
-      </div>
-      
-      {!isShort && description && (
-        <div className="text-xs text-zinc-700 dark:text-zinc-300 truncate mt-0.5 leading-tight">
-          {description}
-        </div>
-      )}
-      
-      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
-        {durationStr}
-      </div>
-    </div>
+	<div className="w-full h-full relative group">
+	  <div
+		className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
+		style={{
+		  borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
+		  opacity: isTentative ? 0.7 : 1
+		}}
+	  >
+		<div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
+		  {projectName} {isTentative && '(Tentative)'}
+		</div>
+
+		{!isShort && description && (
+		  <div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
+			{description}
+		  </div>
+		)}
+
+		<div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
+		  {durationStr}
+		</div>
+	  </div>
+
+	  {/* Custom Hover Tooltip */}
+	  <div className="absolute top-[calc(100%+4px)] left-0 hidden group-hover:block z-[9999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words">
+		{tooltipText}
+	  </div>
+	</div>
   );
 }
 
@@ -345,8 +355,41 @@ export default function CalendarPage() {
     api[dir]()
   }
 
+  const renderDayHeader = (arg: DayHeaderContentArg) => {
+    let totalMins = 0;
+    let personalMins = 0;
+
+    const dayStart = arg.date;
+    const dayEnd = new Date(dayStart.getTime() + 86400000); // Add 24 hours
+
+    calendarEvents.forEach(e => {
+      const eStart = new Date(e.start);
+      if (eStart >= dayStart && eStart < dayEnd) {
+      const mins = differenceInMinutes(new Date(e.end), eStart);
+      if (e.extendedProps.isPersonal) {
+        personalMins += mins;
+      } else if (!e.extendedProps.isTentative) {
+        totalMins += mins;
+      }
+      }
+    });
+
+    const fTime = (m: number) => `${Math.floor(m / 60)}:${(m % 60).toString().padStart(2, '0')}`;
+
+    return (
+      <div className="flex flex-col items-center justify-center p-1">
+      <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+        {format(arg.date, 'EEE M/d')}
+      </div>
+      <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-0.5">
+        {fTime(totalMins)} {personalMins > 0 ? <span className="text-blue-600 dark:text-blue-400 ml-1">({fTime(personalMins)} Personal)</span> : ''}
+      </div>
+      </div>
+    );
+  }
+
   const getDropdownLabel = () => {
-    const today = startOfToday()
+	const today = startOfToday()
     if (currentView === 'timeGridWeek') {
       const diff = differenceInCalendarWeeks(today, currentDate, { weekStartsOn: 0 })
       if (diff === 0) return 'This week'
@@ -378,6 +421,10 @@ export default function CalendarPage() {
           background-color: transparent !important;
           border: none !important;
           box-shadow: none !important;
+          overflow: visible !important;
+        }
+        .fc-timegrid-event-harness:hover {
+          z-index: 9999 !important;
         }
         .fc-timegrid-slot {
           height: calc(1.5em * ${zoomLevel}) !important;
@@ -463,6 +510,7 @@ export default function CalendarPage() {
           eventResize={handleEventResize}
           select={handleDateSelect}
           eventClick={handleEventClick}
+          dayHeaderContent={renderDayHeader}
           datesSet={(arg) => {
             setCalendarTitle(arg.view.title)
             setCurrentDate(arg.view.currentStart)
