@@ -152,7 +152,7 @@ export default function GlobalTimer() {
       <div className="flex-1 relative min-w-0 flex items-center">
         <input
           type="text"
-          maxLength={80}
+          maxLength={250}
           placeholder="What are you working on?"
           value={description}
           onChange={(e) => { setDescription(e.target.value); setShowSuggestions(true); }}
@@ -161,7 +161,7 @@ export default function GlobalTimer() {
           className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
         />
         
-        {description.length >= 50 && (
+        {description.length >= 120 && (
           <span className="absolute right-0 -top-6 text-[10px] text-red-500 font-medium bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded shadow-sm border border-red-200 dark:border-red-900 z-10">
             {description.length}/80
           </span>

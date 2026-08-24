@@ -1148,9 +1148,9 @@ export default function ReportsPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
-                  {editDescription.length >= 50 && <span className="text-[10px] text-red-500">{editDescription.length}/80</span>}
+                  {editDescription.length >= 120 && <span className="text-[10px] text-red-500">{editDescription.length}/80</span>}
                 </div>
-                <input disabled={editingEntry.user_id !== user?.id} type="text" maxLength={80} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                <input disabled={editingEntry.user_id !== user?.id} type="text" maxLength={250} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
@@ -1227,11 +1227,11 @@ export default function ReportsPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">New Description</label>
-                  {bulkEditDescription.length >= 50 && <span className="text-[10px] text-red-500">{bulkEditDescription.length}/80</span>}
+                  {bulkEditDescription.length >= 120 && <span className="text-[10px] text-red-500">{bulkEditDescription.length}/80</span>}
                 </div>
                 <input 
                   type="text" 
-                  maxLength={80}
+                  maxLength={250}
                   value={bulkEditDescription} 
                   onChange={(e) => setBulkEditDescription(e.target.value)} 
                   disabled={bulkClearDescription}
