@@ -25,35 +25,36 @@ function renderEventContent(eventInfo: EventContentArg) {
   const isShort = durationMins <= 45;
 
   const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
-  const tooltipText = `${description ? description + ' - ' : ''}${projectName} ${durationStr} ${timeRangeStr}`;
 
   return (
 	<div className="w-full h-full relative group">
 	  <div
-		className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-red-500/50 opacity-95' : ''}`}
+		className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
 		style={{
 		  borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
 		  opacity: isTentative ? 0.7 : 1
 		}}
 	  >
-		<div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
-		  {projectName} {isTentative && '(Tentative)'}
-		</div>
+      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
+        {projectName} {isTentative && '(Tentative)'}
+      </div>
 
-		{!isShort && description && (
-		  <div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
-			{description}
-		  </div>
-		)}
+      {!isShort && description && (
+        <div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
+          {description}
+        </div>
+      )}
 
-		<div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
-		  {durationStr}
-		</div>
+      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
+        {durationStr}
+      </div>
 	  </div>
 
 	  {/* Custom Hover Tooltip */}
 	  <div className="absolute top-[calc(100%+4px)] left-0 hidden group-hover:block z-[9999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words">
-		{tooltipText}
+      {description ? `${description} - ` : ''}{projectName}
+      <br />
+      {durationStr} {timeRangeStr}
 	  </div>
 	</div>
   );
@@ -416,8 +417,17 @@ export default function CalendarPage() {
           --fc-border-color: #27272a;
           --fc-today-bg-color: rgba(39, 39, 42, 0.5);
         }
-        :root { --fc-now-indicator-color: #ef4444; }
-        .fc-timegrid-event-harness > .fc-timegrid-event {
+        .fc { 
+          --fc-now-indicator-color: #3b82f6; 
+          --fc-event-border-color: transparent;
+          --fc-event-bg-color: transparent;
+        }
+        .fc-timegrid-now-indicator-line,
+        .fc-timegrid-now-indicator-arrow {
+          z-index: 1 !important;
+        }
+        .fc-timegrid-event-harness > .fc-timegrid-event,
+        .fc-timegrid-event-harness .fc-event-main {
           background-color: transparent !important;
           border: none !important;
           box-shadow: none !important;
@@ -444,12 +454,12 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
           {isAdmin && team.length > 0 && (
-			<select
-			  value={selectedUserId}
-			  onChange={(e) => setSelectedUserId(e.target.value)}
-			  className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
-        >
-          {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
+              >
+                {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
             </select>
           )}
           <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-md p-0.5 shrink-0">
