@@ -45,7 +45,7 @@ export default function DescriptionAutocomplete({ value, onChange, disabled, pla
 	<div className="relative w-full" ref={suggestionsRef}>
 	  <input
 		type="text"
-		maxLength={250}
+		maxLength={500}
 		value={value}
 		onChange={(e) => { onChange(e.target.value); setShowSuggestions(true); }}
 		onFocus={() => setShowSuggestions(true)}
