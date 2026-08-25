@@ -780,7 +780,7 @@ export default function ReportsPage() {
                     className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-zinc-900"
                   />
                   <div className="flex-1 flex justify-between items-center overflow-hidden">
-                    <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">{p.name}</span>
+                    <span className="font-medium text-sm truncate" style={{ color: p.color_hex }}>{p.name}</span>
                     <span className="text-xs text-zinc-400 dark:text-zinc-500 ml-2 shrink-0">{p.user_id ? 'Personal' : p.clients?.name}</span>
                   </div>
                 </label>
@@ -1050,13 +1050,14 @@ export default function ReportsPage() {
                     <div key={p} className="flex items-center justify-between mb-3">
                       <span className="text-sm text-zinc-700 dark:text-zinc-300 font-medium truncate pr-4">{p}</span>
                       <div className="w-1/2 flex gap-2">
-                        <select 
-                          value={projectMapping[p] || ''} 
+                        <select
+                          value={projectMapping[p] || ''}
                           onChange={e => setProjectMapping({...projectMapping, [p]: e.target.value})}
+                          style={{ color: projects.find(dbP => dbP.id === projectMapping[p])?.color_hex || 'inherit' }}
                           className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
                         >
-                          <option value="">Skip (Do not import)</option>
-                          {projects.map(dbP => <option key={dbP.id} value={dbP.id}>{dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
+                          <option value="" style={{ color: 'inherit' }}>Skip (Do not import)</option>
+                          {projects.map(dbP => <option key={dbP.id} value={dbP.id} style={{ color: dbP.color_hex, fontWeight: '500' }}>{dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
                         </select>
                         <button 
                           type="button"
@@ -1141,9 +1142,9 @@ export default function ReportsPage() {
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select disabled={editingEntry.user_id !== user?.id} value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50">
-                  <option value="">No Project</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <select disabled={editingEntry.user_id !== user?.id} value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50">
+                  <option value="" style={{ color: 'inherit' }}>No Project</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
                 </select>
               </div>
               <div>
@@ -1217,9 +1218,9 @@ export default function ReportsPage() {
             <form onSubmit={handleBulkEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">New Project</label>
-                <select value={bulkEditProjectId} onChange={(e) => setBulkEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-                  <option value="">-- No Change --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <select value={bulkEditProjectId} onChange={(e) => setBulkEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === bulkEditProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                  <option value="" style={{ color: 'inherit' }}>-- No Change --</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
                 </select>
               </div>
               

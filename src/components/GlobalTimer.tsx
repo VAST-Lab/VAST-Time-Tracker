@@ -154,13 +154,14 @@ export default function GlobalTimer() {
       <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-full w-full max-w-2xl mx-auto">
         <AlertCircle size={16} className="text-red-500 shrink-0" />
         <span className="text-[10px] md:text-xs text-red-700 dark:text-red-400 shrink-0 hidden md:inline">Project Required:</span>
-        <select 
-          value={selectedProject} 
+        <select
+          value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
-          className="flex-1 bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-800 rounded text-xs px-2 py-1 outline-none text-zinc-900 dark:text-zinc-100 [&>option]:bg-white dark:[&>option]:bg-zinc-950"
+          style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
+          className="flex-1 bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-800 rounded text-xs px-2 py-1 outline-none [&>option]:bg-white dark:[&>option]:bg-zinc-950"
         >
-          <option value="">Select a project to save...</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          <option value="" style={{ color: 'inherit' }}>Select a project to save...</option>
+          {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
         </select>
         <button onClick={confirmStop} disabled={!selectedProject} className="px-3 py-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-xs font-medium rounded transition-colors shrink-0">
           Save & Stop
@@ -214,13 +215,14 @@ export default function GlobalTimer() {
 
       <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0`} />
       
-      <select 
-        value={selectedProject} 
+      <select
+        value={selectedProject}
         onChange={handleProjectChange}
-        className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 text-zinc-900 dark:text-zinc-100 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900"
+        style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
+        className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900"
       >
-        <option value="">Project</option>
-        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        <option value="" style={{ color: 'inherit' }}>Project</option>
+        {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
       </select>
 
       {activeEntry && (

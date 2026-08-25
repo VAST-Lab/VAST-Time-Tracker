@@ -358,9 +358,9 @@ export default function DashboardPage() {
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select required value={manualProjectId} onChange={(e) => setManualProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-                  <option value="">Select Project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <select required value={manualProjectId} onChange={(e) => setManualProjectId(e.target.value)} style={{ color: projects.find(p => p.id === manualProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
                 </select>
               </div>
               <div>
@@ -402,9 +402,9 @@ export default function DashboardPage() {
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
-                  <option value="">Select Project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
                 </select>
               </div>
               <div>

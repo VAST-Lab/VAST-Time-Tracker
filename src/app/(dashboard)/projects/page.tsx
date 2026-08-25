@@ -129,7 +129,7 @@ export default function ProjectsPage() {
             <div key={project.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 shadow-sm flex flex-col gap-3">
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate">{project.name}</div>
+                  <div className="font-medium text-sm truncate" style={{ color: project.color_hex }}>{project.name}</div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
                     {project.user_id ? <span className="text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">Personal</span> : project.clients?.name}
                   </div>
@@ -166,9 +166,9 @@ export default function ProjectsPage() {
             {projects.map((project) => {
               const canEdit = isAdmin || project.user_id === user?.id;
               return (
-                <tr key={project.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                  <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">{project.name}</td>
-                  <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400">
+              <tr key={project.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <td className="px-6 py-4 font-medium" style={{ color: project.color_hex }}>{project.name}</td>
+                <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400">
                     {project.user_id ? <span className="text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider">Personal</span> : project.clients?.name}
                   </td>
                   <td className="px-6 py-4">
