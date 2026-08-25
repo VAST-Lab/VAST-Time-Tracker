@@ -198,6 +198,7 @@ export default function CalendarPage() {
     let totalMins = 0;
     let forecastedMins = 0;
     let personalMins = 0;
+    let tentativeMins = 0;
 
     const startBound = currentView === 'timeGridWeek' ? startOfWeek(currentDate) : currentDate;
     const endBound = currentView === 'timeGridWeek' ? addWeeks(startBound, 1) : new Date(currentDate.getTime() + 86400000);
@@ -210,7 +211,11 @@ export default function CalendarPage() {
           personalMins += mins;
         } else {
           forecastedMins += mins;
-          if (!e.extendedProps.isTentative) totalMins += mins;
+          if (!e.extendedProps.isTentative) {
+            totalMins += mins;
+          } else {
+            tentativeMins += mins;
+          }
         }
       }
     });
@@ -220,6 +225,7 @@ export default function CalendarPage() {
       total: fTotal(totalMins),
       forecasted: fTotal(forecastedMins),
       personal: personalMins > 0 ? fTotal(personalMins) : null,
+      tentative: tentativeMins > 0 ? fTotal(tentativeMins) : null,
       showForecasted: totalMins !== forecastedMins
     };
   }, [calendarEvents, currentView, currentDate]);
@@ -359,6 +365,7 @@ export default function CalendarPage() {
   const renderDayHeader = (arg: DayHeaderContentArg) => {
     let totalMins = 0;
     let personalMins = 0;
+    let tentativeMins = 0;
 
     const dayStart = arg.date;
     const dayEnd = new Date(dayStart.getTime() + 86400000); // Add 24 hours
@@ -371,6 +378,8 @@ export default function CalendarPage() {
         personalMins += mins;
       } else if (!e.extendedProps.isTentative) {
         totalMins += mins;
+      } else {
+        tentativeMins += mins;
       }
       }
     });
@@ -378,13 +387,15 @@ export default function CalendarPage() {
     const fTime = (m: number) => `${Math.floor(m / 60)}:${(m % 60).toString().padStart(2, '0')}`;
 
     return (
-      <div className="flex flex-col items-center justify-center p-1">
-      <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-        {format(arg.date, 'EEE M/d')}
-      </div>
-      <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-0.5">
-        {fTime(totalMins)} {personalMins > 0 ? <span className="text-blue-600 dark:text-blue-400 ml-1">({fTime(personalMins)} Personal)</span> : ''}
-      </div>
+      <div className="flex flex-col items-center justify-center p-1 text-center">
+        <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+          {format(arg.date, 'EEE M/d')}
+        </div>
+        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-0.5 flex flex-wrap justify-center gap-x-1">
+          <span>{fTime(totalMins)}</span>
+          {personalMins > 0 ? <span className="text-blue-600 dark:text-blue-400">({fTime(personalMins)} Personal)</span> : null}
+          {tentativeMins > 0 ? <span className="text-yellow-600 dark:text-yellow-400">({fTime(tentativeMins)} Tentative)</span> : null}
+        </div>
       </div>
     );
   }
@@ -478,6 +489,7 @@ export default function CalendarPage() {
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
             {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
             {totals.personal && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {totals.personal}</span>}
+            {totals.tentative && <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">Tentative: {totals.tentative}</span>}
           </div>
           
           <div className="relative">
@@ -519,14 +531,15 @@ export default function CalendarPage() {
           selectMirror={true}
           dayMaxEvents={true}
           nowIndicator={true}
+          allDaySlot={false}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
           select={handleDateSelect}
           eventClick={handleEventClick}
           dayHeaderContent={renderDayHeader}
           datesSet={(arg) => {
-            setCalendarTitle(arg.view.title)
-            setCurrentDate(arg.view.currentStart)
+          setCalendarTitle(arg.view.title)
+          setCurrentDate(arg.view.currentStart)
           }}
           height="100%"
           scrollTime="09:00:00"
