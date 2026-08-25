@@ -6,6 +6,7 @@ import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, updateTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
 import { Play, Square, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
 
 const formatTime = (totalSeconds: number) => {
   const hours = Math.floor(totalSeconds / 3600)
@@ -30,17 +31,23 @@ export default function GlobalTimer() {
   // Stop Validation State
   const [isValidatingStop, setIsValidatingStop] = useState(false)
 
+  // Start Time Edit State
+  const [isEditingStartTime, setIsEditingStartTime] = useState(false)
+  const [editStartValue, setEditStartValue] = useState('')
+
   // Sync with active entry on load or when active entry starts/stops
   useEffect(() => {
-    if (activeEntry) {
-      setDescription(activeEntry.description || '')
-      setSelectedProject(activeEntry.project_id || '')
-      setIsValidatingStop(false)
-    } else {
-      setDescription('')
-      setSelectedProject('')
-      setIsValidatingStop(false)
-    }
+	if (activeEntry) {
+	  setDescription(activeEntry.description || '')
+	  setSelectedProject(activeEntry.project_id || '')
+	  setIsValidatingStop(false)
+	  setIsEditingStartTime(false)
+	} else {
+	  setDescription('')
+	  setSelectedProject('')
+	  setIsValidatingStop(false)
+	  setIsEditingStartTime(false)
+	}
   }, [activeEntry?.id])
 
   useEffect(() => {
@@ -114,8 +121,27 @@ export default function GlobalTimer() {
     }
   }
 
+  const handleDurationClick = () => {
+	if (!activeEntry) return
+	setEditStartValue(format(new Date(activeEntry.start_time), 'HH:mm'))
+	setIsEditingStartTime(true)
+  }
+
+  const handleStartTimeSubmit = async () => {
+	setIsEditingStartTime(false)
+	if (!activeEntry || !editStartValue) return
+
+	const originalDate = format(new Date(activeEntry.start_time), 'yyyy-MM-dd')
+	const newStartIso = new Date(`${originalDate}T${editStartValue}`).toISOString()
+
+	if (newStartIso !== activeEntry.start_time) {
+	  await updateTimeEntry(activeEntry.id, { start_time: newStartIso })
+	  triggerRefresh()
+	}
+  }
+
   const confirmStop = async () => {
-    if (!selectedProject) return
+	if (!selectedProject) return
     if (activeEntry && activeEntry.description !== description) {
       await updateTimeEntry(activeEntry.id, { description })
     }
@@ -198,12 +224,28 @@ export default function GlobalTimer() {
       </select>
 
       {activeEntry && (
-        <>
-          <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
-          <div className="font-mono text-sm md:text-base tracking-wider px-1 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0">
-            {formatTime(elapsedSeconds)}
-          </div>
-        </>
+      <>
+        <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
+        {isEditingStartTime ? (
+        <input
+          type="time"
+          autoFocus
+          value={editStartValue}
+          onChange={(e) => setEditStartValue(e.target.value)}
+          onBlur={handleStartTimeSubmit}
+          onKeyDown={(e) => e.key === 'Enter' && handleStartTimeSubmit()}
+          className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0"
+        />
+        ) : (
+        <div
+          onClick={handleDurationClick}
+          className="font-mono text-sm md:text-base tracking-wider px-1 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80"
+          title="Click to edit start time"
+        >
+          {formatTime(elapsedSeconds)}
+        </div>
+        )}
+      </>
       )}
 
       <button 
