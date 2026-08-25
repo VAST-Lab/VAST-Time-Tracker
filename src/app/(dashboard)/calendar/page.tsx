@@ -11,7 +11,7 @@ import { getProjects, getTeamMembers } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry, Profile } from '@/types/supabase'
 import { format, differenceInMinutes, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
-import { ChevronDown, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Minus, X } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
@@ -537,14 +537,17 @@ export default function CalendarPage() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Log Time Block</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Log Time Block</h2>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} style={{ color: projects.find(p => p.id === modalProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
-                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
-                </select>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+              <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} style={{ color: projects.find(p => p.id === modalProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
+                <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+              </select>
               </div>
               <div>
                 <div className="flex justify-between items-end mb-1">
@@ -594,14 +597,17 @@ export default function CalendarPage() {
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Time Block</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Edit Time Block</h2>
+              <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
-                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
-                </select>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+              <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
+                <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+              </select>
               </div>
               <div>
                 <div className="flex justify-between items-end mb-1">

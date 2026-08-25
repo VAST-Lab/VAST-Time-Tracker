@@ -996,9 +996,9 @@ export default function ReportsPage() {
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center mb-6">
+           <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Bulk Import Time Logs</h2>
-              <button onClick={closeImportModal} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={20} /></button>
+              <button onClick={closeImportModal} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
             </div>
             
             {importStep === 1 ? (
@@ -1057,7 +1057,7 @@ export default function ReportsPage() {
                           className="flex-1 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100"
                         >
                           <option value="" style={{ color: 'inherit' }}>Skip (Do not import)</option>
-                          {projects.map(dbP => <option key={dbP.id} value={dbP.id} style={{ color: dbP.color_hex, fontWeight: '500' }}>{dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
+                          {projects.map(dbP => <option key={dbP.id} value={dbP.id} style={{ color: dbP.color_hex, fontWeight: '500' }}>● {dbP.name} {dbP.client_id ? `(${dbP.clients?.name})` : '(Personal)'}</option>)}
                         </select>
                         <button 
                           type="button"
@@ -1091,7 +1091,10 @@ export default function ReportsPage() {
       {isCreateProjectModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Quick Create Project</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Quick Create Project</h3>
+              <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleCreateInlineProject} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project Name</label>
@@ -1138,14 +1141,17 @@ export default function ReportsPage() {
       {editingEntry && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Time Log</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Edit Time Log</h3>
+              <button type="button" onClick={() => setEditingEntry(null)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-                <select disabled={editingEntry.user_id !== user?.id} value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50">
-                  <option value="" style={{ color: 'inherit' }}>No Project</option>
-                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
-                </select>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+              <select disabled={editingEntry.user_id !== user?.id} value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50">
+                <option value="" style={{ color: 'inherit' }}>No Project</option>
+                {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+              </select>
               </div>
               <div>
               <div className="flex justify-between items-end mb-1">
@@ -1204,10 +1210,10 @@ export default function ReportsPage() {
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-xl w-full max-w-md border border-zinc-200 dark:border-zinc-800 flex flex-col">
             <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <Edit2 size={20} />
-                Bulk Edit Entries
+              <Edit2 size={20} />
+              Bulk Edit Entries
               </h2>
-              <button onClick={() => setIsBulkEditModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={20} /></button>
+              <button onClick={() => setIsBulkEditModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
             </div>
             
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
@@ -1220,7 +1226,7 @@ export default function ReportsPage() {
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">New Project</label>
                 <select value={bulkEditProjectId} onChange={(e) => setBulkEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === bulkEditProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
                   <option value="" style={{ color: 'inherit' }}>-- No Change --</option>
-                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>{p.name}</option>)}
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
                 </select>
               </div>
               
@@ -1272,10 +1278,10 @@ export default function ReportsPage() {
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800 flex flex-col">
             <div className="flex justify-between items-center mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <h2 className="text-xl font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-                <Trash2 size={20} />
-                Data Cleanup
+              <Trash2 size={20} />
+              Data Cleanup
               </h2>
-              <button onClick={() => setIsCleanupModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={20} /></button>
+              <button onClick={() => setIsCleanupModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
             </div>
             
             <div className="space-y-6">

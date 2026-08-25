@@ -5,9 +5,9 @@ import {
   getGroups, createGroup, deleteGroup, getGroupClients, updateGroupClients, getClients,
   getPendingInvitations, createInvitation, deleteInvitation
 } from '@/utils/supabase/api'
-import { Profile, UserRole, Group, Client, Invitation } from '@/types/supabase'
+import { UserRole, Group, Client } from '@/types/supabase'
 import { useAdmin } from '@/hooks/useAdmin'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, X } from 'lucide-react'
 
 type UnifiedMember = {
   id: string;
@@ -312,7 +312,10 @@ export default function TeamsPage() {
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Invite Team Member</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Invite Team Member</h2>
+              <button type="button" onClick={() => setIsInviteModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleInviteSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Email</label>
@@ -345,8 +348,11 @@ export default function TeamsPage() {
       {editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">{editingMember.isInvite ? 'Pending Invitation' : 'Edit Team Member'}</h2>
-            
+           <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{editingMember.isInvite ? 'Pending Invitation' : 'Edit Team Member'}</h2>
+              <button type="button" onClick={() => { setEditingMember(null); setGeneratedLink(''); }} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
+
             {editingMember.isInvite ? (
               <div className="space-y-4">
                 <div>
@@ -392,7 +398,10 @@ export default function TeamsPage() {
       {editingGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Access: {editingGroup.name}</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Edit Access: {editingGroup.name}</h2>
+              <button type="button" onClick={() => setEditingGroup(null)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleGroupSubmit} className="space-y-4">
               <div className="max-h-60 overflow-y-auto border border-zinc-200 dark:border-zinc-800 rounded-md p-3 space-y-2">
                 {clients.map(client => (

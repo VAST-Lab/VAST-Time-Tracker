@@ -4,6 +4,7 @@ import { getProjects, createProject, updateProject, deleteProject, getClients } 
 import { Project, Client } from '@/types/supabase'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
+import { X } from 'lucide-react'
 
 export default function ProjectsPage() {
   const { user } = useAuth()
@@ -194,7 +195,10 @@ export default function ProjectsPage() {
       {editingProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg w-full max-w-md border border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4">Edit Project</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Edit Project</h2>
+              <button type="button" onClick={() => setEditingProject(null)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={24} /></button>
+            </div>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
