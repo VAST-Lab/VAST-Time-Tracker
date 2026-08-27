@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, updateTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { Play, Square, AlertCircle } from 'lucide-react'
+import { Play, Square, AlertCircle, MoreVertical } from 'lucide-react'
 import { format } from 'date-fns'
 
 const formatTime = (totalSeconds: number) => {
@@ -17,7 +17,7 @@ const formatTime = (totalSeconds: number) => {
 
 export default function GlobalTimer() {
   const { user } = useAuth()
-  const { activeEntry, elapsedSeconds, handleStart, handleStop, triggerRefresh } = useTimer()
+  const { activeEntry, elapsedSeconds, handleStart, handleStop, handleDiscard, triggerRefresh } = useTimer()
   const [projects, setProjects] = useState<Project[]>([])
   const [recentEntries, setRecentEntries] = useState<TimeEntry[]>([])
   
@@ -27,6 +27,10 @@ export default function GlobalTimer() {
   // Autocomplete State
   const [showSuggestions, setShowSuggestions] = useState(false)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   
   // Stop Validation State
   const [isValidatingStop, setIsValidatingStop] = useState(false)
@@ -68,7 +72,10 @@ export default function GlobalTimer() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false)
+      setShowSuggestions(false)
+      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      setIsMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -151,12 +158,36 @@ export default function GlobalTimer() {
   }
 
   const confirmStop = async () => {
-	if (!selectedProject) return
+    if (!selectedProject) return
     if (activeEntry && activeEntry.description !== description) {
       await updateTimeEntry(activeEntry.id, { description })
     }
     await handleStop(selectedProject)
     setIsValidatingStop(false)
+  }
+
+  const handleDiscardClick = async () => {
+    setIsMenuOpen(false)
+    if (confirm('Are you sure you want to discard this time entry?')) {
+      await handleDiscard()
+      setDescription('')
+      setSelectedProject('')
+    }
+  }
+
+  const handleEndAndStartNew = async () => {
+    setIsMenuOpen(false)
+    if (!selectedProject) {
+      alert("Please select a project before ending this timer.")
+      return
+    }
+    if (activeEntry && activeEntry.description !== description) {
+      await updateTimeEntry(activeEntry.id, { description })
+    }
+    await handleStop(selectedProject)
+    await handleStart(null, '')
+    setDescription('')
+    setSelectedProject('')
   }
 
   if (isValidatingStop) {
@@ -260,16 +291,35 @@ export default function GlobalTimer() {
       </>
       )}
 
-      <button 
-        onClick={handlePlayStop}
-        className={`p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0`}
-      >
-        {activeEntry ? (
+      <div className="flex items-center gap-1 shrink-0" ref={menuRef}>
+        <button
+          onClick={handlePlayStop}
+          className={`p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0`}
+        >
+          {activeEntry ? (
           <Square size={14} className="md:w-4 md:h-4" fill="currentColor" />
-        ) : (
+          ) : (
           <Play size={14} className="md:w-4 md:h-4" fill="currentColor" />
+          )}
+        </button>
+
+        {activeEntry && (
+          <div className="relative">
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            <MoreVertical size={18} />
+          </button>
+          {isMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 z-50 overflow-hidden">
+            <button onClick={handleEndAndStartNew} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">End and Start New</button>
+            <button onClick={handleDiscardClick} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Cancel and Discard</button>
+            </div>
+          )}
+          </div>
         )}
-      </button>
+      </div>
     </div>
   )
 }
