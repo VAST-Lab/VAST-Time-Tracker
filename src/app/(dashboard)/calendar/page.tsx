@@ -80,6 +80,20 @@ export default function CalendarPage() {
   
   // Hover Tooltip State
   const [hoverTooltip, setHoverTooltip] = useState<{ x: number, y: number, description: string, projectName: string, durationStr: string, timeRangeStr: string } | null>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+	const handleMouseMove = (e: MouseEvent) => {
+	  if (tooltipRef.current) {
+		tooltipRef.current.style.left = `${e.clientX + 15}px`
+		tooltipRef.current.style.top = `${e.clientY + 15}px`
+	  }
+	}
+	if (hoverTooltip) {
+	  window.addEventListener('mousemove', handleMouseMove)
+	}
+	return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [hoverTooltip])
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -425,6 +439,7 @@ export default function CalendarPage() {
     <div className="h-full flex flex-col space-y-4">
       {hoverTooltip && (
         <div 
+          ref={tooltipRef}
           className="fixed z-[99999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words"
           style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
         >
