@@ -10,7 +10,9 @@ async function getUserAccess() {
   const isAdmin = profile?.role === 'admin';
   const allowedClientIds: string[] = [];
 
-  if (!isAdmin && profile?.group_id) {
+  // Always fetch allowed client IDs if the user is in a group, even for admins, 
+  // so we can use limitToAccessGroup filters correctly on the frontend.
+  if (profile?.group_id) {
     const { data: gc } = await supabase.from('group_clients').select('client_id').eq('group_id', profile.group_id);
     if (gc) {
       gc.forEach(g => allowedClientIds.push(g.client_id as string));
@@ -51,7 +53,7 @@ export async function deleteClient(id: string): Promise<void> {
 }
 
 // --- PROJECTS API ---
-export async function getProjects(): Promise<Project[]> {
+export async function getProjects(limitToAccessGroup = false): Promise<Project[]> {
   const { data: { user } } = await supabase.auth.getUser();
   const { isAdmin, allowedClientIds } = await getUserAccess();
 
@@ -59,12 +61,16 @@ export async function getProjects(): Promise<Project[]> {
   if (error) throw error;
 
   const projects = (data as Project[]) || [];
-  if (!isAdmin) {
-	return projects.filter(p =>
-	  (p.client_id && allowedClientIds.includes(p.client_id)) ||
-	  p.user_id === user?.id
-	);
+  
+  // If user is a standard user, OR if they are an admin but we specifically requested to limit their view
+  if (!isAdmin || limitToAccessGroup) {
+    return projects.filter(p =>
+      (p.client_id && allowedClientIds.includes(p.client_id)) ||
+      p.user_id === user?.id
+    );
   }
+  
+  // Otherwise, if admin and unconstrained, show all shared projects + their own personal projects
   return projects.filter(p => !p.user_id || p.user_id === user?.id);
 }
 

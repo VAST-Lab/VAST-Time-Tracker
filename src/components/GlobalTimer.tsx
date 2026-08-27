@@ -35,6 +35,16 @@ export default function GlobalTimer() {
   const [isEditingStartTime, setIsEditingStartTime] = useState(false)
   const [editStartValue, setEditStartValue] = useState('')
 
+  // Update Document Title (Browser Tab) with elapsed time
+  useEffect(() => {
+    const baseTitle = 'TimeTracker Dashboard'
+    if (activeEntry) {
+      document.title = `${formatTime(elapsedSeconds)} ● ${baseTitle}`
+    } else {
+      document.title = baseTitle
+    }
+  }, [activeEntry, elapsedSeconds])
+
   // Sync with active entry on load or when active entry starts/stops
   useEffect(() => {
 	if (activeEntry) {
@@ -51,7 +61,7 @@ export default function GlobalTimer() {
   }, [activeEntry?.id])
 
   useEffect(() => {
-    getProjects().then(setProjects)
+    getProjects(true).then(setProjects)
     if (user) getMyRecentEntries(user.id).then(setRecentEntries)
   }, [user])
 

@@ -141,10 +141,10 @@ export default function CalendarPage() {
   }, [isAdmin])
 
   const loadCalendarData = async (targetUserId: string) => {
-	if (!user) return
-	const [projData, timeData] = await Promise.all([
-	  getProjects(),
-	  getMyRecentEntries(targetUserId)
+    if (!user) return
+    const [projData, timeData] = await Promise.all([
+      getProjects(true),
+      getMyRecentEntries(targetUserId)
 	])
     
     setProjects(projData)

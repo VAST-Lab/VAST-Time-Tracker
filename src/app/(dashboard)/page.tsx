@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const [editIsTentative, setEditIsTentative] = useState(false)
 
   useEffect(() => {
-    getProjects().then(setProjects)
+	  getProjects(true).then(setProjects)
   }, [])
 
   useEffect(() => {
