@@ -24,37 +24,26 @@ function renderEventContent(eventInfo: EventContentArg) {
   const durationMins = start ? differenceInMinutes(end, start) : 60;
   const isShort = durationMins <= 45;
 
-  const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
-
   return (
-	<div className="w-full h-full relative group">
-	  <div
-		className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
-		style={{
-		  borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
-		  opacity: isTentative ? 0.7 : 1
-		}}
-	  >
-      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
-        {projectName} {isTentative && '(Tentative)'}
-      </div>
-
-      {!isShort && description && (
-        <div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
-          {description}
-        </div>
-      )}
-
-      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
-        {durationStr}
-      </div>
+	<div
+	  className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
+	  style={{
+		borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
+		opacity: isTentative ? 0.7 : 1
+	  }}
+	>
+	  <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
+		{projectName} {isTentative && '(Tentative)'}
 	  </div>
 
-	  {/* Custom Hover Tooltip */}
-	  <div className="absolute top-[calc(100%+4px)] left-0 hidden group-hover:block z-[9999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words">
-      {description ? `${description} - ` : ''}{projectName}
-      <br />
-      {durationStr} {timeRangeStr}
+	  {!isShort && description && (
+		<div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
+		  {description}
+		</div>
+	  )}
+
+	  <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
+		{durationStr}
 	  </div>
 	</div>
   );
@@ -89,6 +78,9 @@ export default function CalendarPage() {
   const [calendarTitle, setCalendarTitle] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
+  // Hover Tooltip State
+  const [hoverTooltip, setHoverTooltip] = useState<{ x: number, y: number, description: string, projectName: string, durationStr: string, timeRangeStr: string } | null>(null)
+
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalProjectId, setModalProjectId] = useState('')
@@ -425,12 +417,23 @@ export default function CalendarPage() {
     }
   }
 
-  const dropdownPresets = currentView === 'timeGridWeek' 
+  const dropdownPresets = currentView === 'timeGridWeek'
     ? ['This week', 'Last week', '2 weeks ago']
     : ['Today', 'Yesterday', '2 days ago', '3 days ago', '4 days ago', '5 days ago', '6 days ago', '7 days ago']
 
   return (
     <div className="h-full flex flex-col space-y-4">
+      {hoverTooltip && (
+        <div 
+          className="fixed z-[99999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words"
+          style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
+        >
+          {hoverTooltip.description ? `${hoverTooltip.description} - ` : ''}{hoverTooltip.projectName}
+          <br />
+          {hoverTooltip.durationStr} {hoverTooltip.timeRangeStr}
+        </div>
+      )}
+
       <style>{`
         .dark {
           --fc-border-color: #27272a;
@@ -454,9 +457,6 @@ export default function CalendarPage() {
           border: none !important;
           box-shadow: none !important;
           overflow: visible !important;
-        }
-        .fc-timegrid-event-harness:hover {
-          z-index: 9999 !important;
         }
         .fc-timegrid-slot {
           height: calc(1.5em * ${zoomLevel}) !important;
@@ -544,6 +544,23 @@ export default function CalendarPage() {
           eventResize={handleEventResize}
           select={handleDateSelect}
           eventClick={handleEventClick}
+          eventMouseEnter={(arg) => {
+            const { event, jsEvent } = arg;
+            const { projectName, description, durationStr } = event.extendedProps;
+            const start = event.start;
+            const end = event.end || new Date();
+            const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
+
+            setHoverTooltip({
+              x: jsEvent.clientX + 15,
+              y: jsEvent.clientY + 15,
+              description: description || '',
+              projectName,
+              durationStr,
+              timeRangeStr
+            });
+          }}
+          eventMouseLeave={() => setHoverTooltip(null)}
           dayHeaderContent={renderDayHeader}
           datesSet={(arg) => {
           setCalendarTitle(arg.view.title)
