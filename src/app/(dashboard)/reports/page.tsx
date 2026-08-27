@@ -712,10 +712,10 @@ export default function ReportsPage() {
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 md:gap-4">
-        
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
+	  <div className="bg-white dark:bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-wrap gap-3 md:gap-4">
+
+      <div className="flex-auto min-w-[280px]">
+        <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Date Range</label>
           <DateRangePicker 
             startDate={startDate} 
             endDate={endDate} 
@@ -724,7 +724,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Filter by Client */}
-        <div className="relative" ref={clientDropdownRef}>
+        <div className="relative flex-1 min-w-[160px]" ref={clientDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Client</label>
           <div 
             onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
@@ -754,7 +754,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Filter by Project */}
-        <div className="relative" ref={projectDropdownRef}>
+        <div className="relative flex-1 min-w-[160px]" ref={projectDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Project</label>
           <div 
             onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
@@ -790,7 +790,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Filter by Group */}
-        <div className="relative" ref={groupDropdownRef}>
+        <div className="relative flex-1 min-w-[160px]" ref={groupDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Group</label>
           <div 
             onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)}
@@ -820,7 +820,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Filter by User */}
-        <div className="relative" ref={userDropdownRef}>
+        <div className="relative flex-1 min-w-[160px]" ref={userDropdownRef}>
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by User</label>
           <div 
             onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
@@ -853,7 +853,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Filter by Description */}
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Filter by Description</label>
           <input
             type="text"

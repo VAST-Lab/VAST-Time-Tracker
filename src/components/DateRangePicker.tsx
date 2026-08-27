@@ -190,7 +190,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 flex flex-col md:flex-row bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden w-[280px] md:w-auto">
+        <div className="absolute top-full left-0 mt-2 z-50 flex flex-col md:flex-row bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden w-[280px] md:w-max">
           {/* Sidebar Presets */}
           <div className="flex flex-col py-2 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 min-w-[140px] max-h-40 md:max-h-none overflow-y-auto">
             {presets.map((preset, idx) => {
