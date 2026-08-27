@@ -25,7 +25,19 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>('compact')
+  const [timeFormat, setTimeFormatState] = useState<TimeFormat>('compact')
+
+  useEffect(() => {
+    const storedFormat = localStorage.getItem('timeFormat') as TimeFormat
+    if (storedFormat === 'compact' || storedFormat === 'colon') {
+      setTimeFormatState(storedFormat)
+    }
+  }, [])
+
+  const setTimeFormat = (format: TimeFormat) => {
+    setTimeFormatState(format)
+    localStorage.setItem('timeFormat', format)
+  }
 
   const triggerRefresh = () => setRefreshTrigger(prev => prev + 1)
 
