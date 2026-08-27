@@ -5,15 +5,16 @@ import { useTimer } from '@/context/TimerContext'
 import { getProjects } from '@/utils/supabase/api'
 import { getMyRecentEntries, updateTimeEntry, deleteTimeEntry, addManualEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry } from '@/types/supabase'
-import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek, differenceInSeconds, startOfHour, addHours } from 'date-fns'
+import { format, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfHour, addHours } from 'date-fns'
 import { Play, Plus, X } from 'lucide-react'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { activeEntry, handleStart, handleStop, handleDiscard, refreshTrigger, triggerRefresh } = useTimer()
+  const { activeEntry, handleStart, handleStop, handleDiscard, refreshTrigger, triggerRefresh, timeFormat } = useTimer()
   const [projects, setProjects] = useState<Project[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [currentTime, setCurrentTime] = useState(new Date())
   
   // Create Manual Modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false)
@@ -37,8 +38,13 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (user) loadEntries()
+	  if (user) loadEntries()
   }, [user, refreshTrigger])
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadEntries = () => {
     if (user) getMyRecentEntries(user.id).then(setEntries)
@@ -158,29 +164,29 @@ export default function DashboardPage() {
   }
 
   // --- FORMATTING LOGIC ---
-  const formatDuration = (start: string, end: string | null) => {
-    if (!end) return 'Running...'
-    let mins = differenceInMinutes(new Date(end), new Date(start))
-    if (mins < 0) mins += 1440 
-    
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
+  const formatTimeValue = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600)
+    const m = Math.floor((totalSecs % 3600) / 60)
+    const s = totalSecs % 60
+    if (timeFormat === 'colon') {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
     return `${h}h ${m}m`
   }
 
-  const formatMins = (mins: number) => {
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
-    return `${h}h ${m}m`
+  const formatDuration = (start: string, end: string | null) => {
+    let secs = differenceInSeconds(end ? new Date(end) : currentTime, new Date(start))
+    if (secs < 0) secs += 86400
+    return formatTimeValue(secs)
   }
 
   const groupedData = useMemo(() => {
-    const groups = new Map<string, { 
-      startDate: Date, 
-      totalMins: number,
-      forecastedMins: number,
-      personalMins: number,
-      days: Map<string, { date: Date, totalMins: number, forecastedMins: number, personalMins: number, entries: TimeEntry[] }> 
+    const groups = new Map<string, {
+      startDate: Date,
+      totalSecs: number,
+      forecastedSecs: number,
+      personalSecs: number,
+      days: Map<string, { date: Date, totalSecs: number, forecastedSecs: number, personalSecs: number, entries: TimeEntry[] }>
     }>();
 
     entries.forEach(entry => {
@@ -189,58 +195,59 @@ export default function DashboardPage() {
       const wEnd = endOfWeek(start, { weekStartsOn: 1 });
       const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`;
       const dayLabel = format(start, 'EEEE, MMM d');
-      
-      const mins = entry.end_time ? differenceInMinutes(new Date(entry.end_time), start) : Math.max(0, differenceInMinutes(new Date(), start));
-      
+
+      let secs = entry.end_time ? differenceInSeconds(new Date(entry.end_time), start) : Math.max(0, differenceInSeconds(currentTime, start));
+      if (secs < 0) secs += 86400; // Handle midnight crossover just in case
+
       const isPersonal = !!entry.projects?.user_id;
       const isTentative = !!entry.is_tentative;
 
       if (!groups.has(weekLabel)) {
-        groups.set(weekLabel, { startDate: wStart, totalMins: 0, forecastedMins: 0, personalMins: 0, days: new Map() });
+        groups.set(weekLabel, { startDate: wStart, totalSecs: 0, forecastedSecs: 0, personalSecs: 0, days: new Map() });
       }
-      
+
       const weekData = groups.get(weekLabel)!;
       if (!weekData.days.has(dayLabel)) {
-        weekData.days.set(dayLabel, { date: start, totalMins: 0, forecastedMins: 0, personalMins: 0, entries: [] });
+        weekData.days.set(dayLabel, { date: start, totalSecs: 0, forecastedSecs: 0, personalSecs: 0, entries: [] });
       }
-      
+
       const dayData = weekData.days.get(dayLabel)!;
-      
+
       if (isPersonal) {
-        weekData.personalMins += mins;
-        dayData.personalMins += mins;
+        weekData.personalSecs += secs;
+        dayData.personalSecs += secs;
       } else {
-        weekData.forecastedMins += mins;
-        dayData.forecastedMins += mins;
+        weekData.forecastedSecs += secs;
+        dayData.forecastedSecs += secs;
         if (!isTentative) {
-          weekData.totalMins += mins;
-          dayData.totalMins += mins;
+          weekData.totalSecs += secs;
+          dayData.totalSecs += secs;
         }
       }
-      
+
       dayData.entries.push(entry);
-    });
+    }); 
 
     return Array.from(groups.entries())
       .map(([label, data]) => ({
         label,
         startDate: data.startDate,
-        totalMins: data.totalMins,
-        forecastedMins: data.forecastedMins,
-        personalMins: data.personalMins,
+        totalSecs: data.totalSecs,
+        forecastedSecs: data.forecastedSecs,
+        personalSecs: data.personalSecs,
         days: Array.from(data.days.entries())
           .map(([dLabel, dData]) => ({
             label: dLabel,
             date: dData.date,
-            totalMins: dData.totalMins,
-            forecastedMins: dData.forecastedMins,
-            personalMins: dData.personalMins,
+            totalSecs: dData.totalSecs,
+            forecastedSecs: dData.forecastedSecs,
+            personalSecs: dData.personalSecs,
             entries: dData.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
           }))
           .sort((a, b) => b.date.getTime() - a.date.getTime())
-      }))
+        }))
       .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-  }, [entries]);
+  }, [entries, currentTime, timeFormat]);
 
   return (
     <div className="space-y-6 md:space-y-8 max-w-7xl">
@@ -302,9 +309,9 @@ export default function DashboardPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 md:mb-4 text-xs md:text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider gap-1">
                 <span>{week.label}</span>
                 <div className="normal-case tracking-normal text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatMins(week.totalMins)}</span>
-                  {week.totalMins !== week.forecastedMins && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatMins(week.forecastedMins)})</span>}
-                  {week.personalMins > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatMins(week.personalMins)}</span>}
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatTimeValue(week.totalSecs)}</span>
+                  {week.totalSecs !== week.forecastedSecs && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatTimeValue(week.forecastedSecs)})</span>}
+                  {week.personalSecs > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatTimeValue(week.personalSecs)}</span>}
                 </div>
               </div>
               
@@ -314,9 +321,9 @@ export default function DashboardPage() {
                     <div className="bg-zinc-50 dark:bg-zinc-950/50 px-3 md:px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                       <span className="text-xs md:text-sm font-medium text-zinc-700 dark:text-zinc-300">{day.label}</span>
                       <div className="text-xs md:text-sm font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
-                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatMins(day.totalMins)}</span>
-                        {day.totalMins !== day.forecastedMins && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatMins(day.forecastedMins)})</span>}
-                        {day.personalMins > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatMins(day.personalMins)}</span>}
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {formatTimeValue(day.totalSecs)}</span>
+                        {day.totalSecs !== day.forecastedSecs && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {formatTimeValue(day.forecastedSecs)})</span>}
+                        {day.personalSecs > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {formatTimeValue(day.personalSecs)}</span>}
                       </div>
                     </div>
                     <div className="divide-y divide-zinc-100 dark:divide-zinc-800">

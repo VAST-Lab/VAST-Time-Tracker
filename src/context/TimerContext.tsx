@@ -4,6 +4,7 @@ import { supabase } from '@/utils/supabase/client'
 import { useAuth } from './AuthContext'
 import { TimeEntry } from '@/types/supabase'
 import { addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
+export type TimeFormat = 'compact' | 'colon';
 
 type TimerContextType = {
   activeEntry: TimeEntry | null;
@@ -13,6 +14,8 @@ type TimerContextType = {
   handleStart: (projectId?: string | null, description?: string) => Promise<void>;
   handleStop: (projectId?: string) => Promise<void>;
   handleDiscard: () => Promise<void>;
+  timeFormat: TimeFormat;
+  setTimeFormat: (format: TimeFormat) => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined)
@@ -22,6 +25,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>('compact')
 
   const triggerRefresh = () => setRefreshTrigger(prev => prev + 1)
 
@@ -88,7 +92,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TimerContext.Provider value={{ activeEntry, elapsedSeconds, refreshTrigger, triggerRefresh, handleStart, handleStop, handleDiscard }}>
+    <TimerContext.Provider value={{ activeEntry, elapsedSeconds, refreshTrigger, triggerRefresh, handleStart, handleStop, handleDiscard, timeFormat, setTimeFormat }}>
       {children}
     </TimerContext.Provider>
   )

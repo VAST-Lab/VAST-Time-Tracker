@@ -2,6 +2,7 @@
 import { TimerProvider } from '@/context/TimerContext'
 import GlobalTimer from '@/components/GlobalTimer'
 import ThemeToggle from '@/components/ThemeToggle'
+import FormatToggle from '@/components/FormatToggle'
 import { useAuth } from '@/context/AuthContext'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useRouter, usePathname } from 'next/navigation'
@@ -118,7 +119,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <GlobalTimer />
               </div>
             </div>
-            <div className="shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <FormatToggle />
               <ThemeToggle />
             </div>
           </header>

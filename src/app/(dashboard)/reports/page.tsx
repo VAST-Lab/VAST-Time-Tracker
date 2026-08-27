@@ -4,23 +4,13 @@ import { supabase } from '@/utils/supabase/client'
 import { getProjects, getTeamMembers, getClients, createProject, getGroups } from '@/utils/supabase/api'
 import { updateTimeEntry, deleteTimeEntry, bulkInsertTimeEntries, bulkUpdateTimeEntries } from '@/utils/supabase/timeApi'
 import { Project, Profile, TimeEntry, Client, Group } from '@/types/supabase'
-import { format, subDays, differenceInMinutes, parseISO, startOfWeek, endOfWeek, startOfToday } from 'date-fns'
+import { format, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfToday } from 'date-fns'
 import { Download, ChevronDown, Upload, X, Edit2, Trash2 } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import { useAuth } from '@/context/AuthContext'
+import { useTimer } from '@/context/TimerContext'
 import DateRangePicker from '@/components/DateRangePicker'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
-
-type ReportUser = {
-  userName: string;
-  totalMinutes: number;
-  entries: TimeEntry[];
-}
-
-type ReportProject = {
-  projectName: string;
-  users: Record<string, ReportUser>;
-}
 
 function parseCSVLine(text: string) {
   const ret = [];
@@ -42,6 +32,7 @@ function parseCSVLine(text: string) {
 export default function ReportsPage() {
   const { user } = useAuth()
   const isAdmin = useAdmin()
+  const { timeFormat } = useTimer()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [team, setTeam] = useState<Profile[]>([])
@@ -200,26 +191,26 @@ export default function ReportsPage() {
       filtered = filtered.filter(e => e.description?.toLowerCase().includes(filterDescription.toLowerCase()))
     }
 
-    const pSummary = new Map<string, { name: string, color: string, mins: number }>()
-    const uSummary = new Map<string, { name: string, mins: number }>()
-    const wGroups = new Map<string, { startDate: Date, mins: number, entries: TimeEntry[] }>()
+    const pSummary = new Map<string, { name: string, color: string, secs: number }>()
+    const uSummary = new Map<string, { name: string, secs: number }>()
+    const wGroups = new Map<string, { startDate: Date, secs: number, entries: TimeEntry[] }>()
 
     filtered.forEach(entry => {
-      let mins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time))
-      if (mins < 0) mins += 1440 // Fallback for legacy negative logs
+      let secs = differenceInSeconds(parseISO(entry.end_time!), parseISO(entry.start_time))
+      if (secs < 0) secs += 86400 // Fallback for legacy negative logs
 
       const pId = entry.project_id
       const uId = entry.user_id
 
       if (!pSummary.has(pId)) {
-        pSummary.set(pId, { name: entry.projects?.name || 'Unknown', color: entry.projects?.color_hex || '#ccc', mins: 0 })
+        pSummary.set(pId, { name: entry.projects?.name || 'Unknown', color: entry.projects?.color_hex || '#ccc', secs: 0 })
       }
-      pSummary.get(pId)!.mins += mins
+      pSummary.get(pId)!.secs += secs
 
       if (!uSummary.has(uId)) {
-        uSummary.set(uId, { name: entry.profiles?.full_name || 'Unknown User', mins: 0 })
+        uSummary.set(uId, { name: entry.profiles?.full_name || 'Unknown User', secs: 0 })
       }
-      uSummary.get(uId)!.mins += mins
+      uSummary.get(uId)!.secs += secs
 
       const start = parseISO(entry.start_time)
       const wStart = startOfWeek(start, { weekStartsOn: 1 })
@@ -227,39 +218,44 @@ export default function ReportsPage() {
       const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`
 
       if (!wGroups.has(weekLabel)) {
-        wGroups.set(weekLabel, { startDate: wStart, mins: 0, entries: [] })
+        wGroups.set(weekLabel, { startDate: wStart, secs: 0, entries: [] })
       }
       const wData = wGroups.get(weekLabel)!
-      wData.mins += mins
+      wData.secs += secs
       wData.entries.push(entry)
     })
 
     return {
       filteredEntries: filtered, // Expose filtered entries for bulk editing
-      projectSummaries: Array.from(pSummary.values()).sort((a, b) => b.mins - a.mins),
-      userSummaries: Array.from(uSummary.values()).sort((a, b) => b.mins - a.mins),
+      projectSummaries: Array.from(pSummary.values()).sort((a, b) => b.secs - a.secs),
+      userSummaries: Array.from(uSummary.values()).sort((a, b) => b.secs - a.secs),
       weeklyData: Array.from(wGroups.entries())
-        .map(([label, data]) => ({
-          label,
-          startDate: data.startDate,
-          mins: data.mins,
-          entries: data.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
-        }))
-        .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
+      .map(([label, data]) => ({
+        label,
+        startDate: data.startDate,
+        secs: data.secs,
+        entries: data.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+      }))
+      .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
     }
   }, [entries, selectedClients, selectedProjects, selectedGroups, selectedUsers, filterDescription])
 
-  const formatHours = (mins: number) => {
-    return `${(mins / 60).toFixed(1)}h`
+  const formatHours = (secs: number) => {
+	  return `${(secs / 3600).toFixed(1)}h`
   }
-  const formatMins = (mins: number) => {
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
+  
+  const formatTimeValue = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600)
+    const m = Math.floor((totalSecs % 3600) / 60)
+    const s = totalSecs % 60
+    if (timeFormat === 'colon') {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
     return `${h}h ${m}m`
   }
 
   const handleExportCSV = () => {
-    let csv = 'Project,Description,Client,User,Date,Start Time,End Time,Duration (h)\n'
+    let csv = 'Project,Description,Client,User,Date,Start Time,End Time,Duration (h),Created At\n'
     entries.forEach(e => {
       const cId = e.projects?.client_id || 'personal'
       const passClient = selectedClients.includes(cId)
@@ -274,10 +270,10 @@ export default function ReportsPage() {
       const passUser = selectedUsers.length === 0 || selectedUsers.includes(e.user_id)
 
       if (passClient && passProject && passGroup && passUser) {
-        let mins = differenceInMinutes(parseISO(e.end_time!), parseISO(e.start_time))
-        if (mins < 0) mins += 1440
-        const duration = mins / 60
-        
+        let secs = differenceInSeconds(parseISO(e.end_time!), parseISO(e.start_time))
+        if (secs < 0) secs += 86400
+        const duration = secs / 3600
+
         const date = format(parseISO(e.start_time), 'yyyy-MM-dd')
         const start = format(parseISO(e.start_time), 'HH:mm')
         const end = format(parseISO(e.end_time!), 'HH:mm')
@@ -286,8 +282,9 @@ export default function ReportsPage() {
         const projectName = `"${(e.projects?.name || '').replace(/"/g, '""')}"`
         const clientName = `"${(e.projects?.clients?.name || 'Personal').replace(/"/g, '""')}"`
         const userName = `"${(e.profiles?.full_name || '').replace(/"/g, '""')}"`
-        
-        csv += `${projectName},${desc},${clientName},${userName},${date},${start},${end},${duration.toFixed(2)}\n`
+        const createdAt = e.created_at ? format(parseISO(e.created_at), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+
+        csv += `${projectName},${desc},${clientName},${userName},${date},${start},${end},${duration.toFixed(2)},${createdAt}\n`
       }
     })
 
@@ -888,25 +885,25 @@ export default function ReportsPage() {
               <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 md:max-h-64 overflow-y-auto">
                 {processedData.projectSummaries.map((proj, idx) => (
                   <li key={idx} className="px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 md:gap-3 truncate pr-4">
-                      <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
-                      <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate">{proj.name}</span>
-                    </div>
-                    <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(proj.mins)}</span>
+                  <div className="flex items-center gap-2 md:gap-3 truncate pr-4">
+                    <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                    <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate">{proj.name}</span>
+                  </div>
+                  <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatTimeValue(proj.secs)}</span>
                   </li>
                 ))}
-              </ul>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col">
-              <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800">
-                <h3 className="font-semibold text-xs md:text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">User Summary</h3>
+                </ul>
               </div>
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 md:max-h-64 overflow-y-auto">
+
+              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-xs md:text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">User Summary</h3>
+                </div>
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 md:max-h-64 overflow-y-auto">
                 {processedData.userSummaries.map((user, idx) => (
                   <li key={idx} className="px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-between">
-                    <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate pr-4">{user.name}</span>
-                    <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatMins(user.mins)}</span>
+                  <span className="font-medium text-xs md:text-sm text-zinc-900 dark:text-zinc-100 truncate pr-4">{user.name}</span>
+                  <span className="font-mono text-xs md:text-sm text-zinc-900 dark:text-zinc-100 shrink-0">{formatTimeValue(user.secs)}</span>
                   </li>
                 ))}
               </ul>
@@ -919,15 +916,15 @@ export default function ReportsPage() {
               <div key={wIdx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
                 <div className="bg-zinc-50 dark:bg-zinc-950 px-4 md:px-6 py-2 md:py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
                   <h3 className="font-semibold text-xs md:text-sm text-zinc-900 dark:text-zinc-100">{week.label}</h3>
-                  <span className="font-mono text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatMins(week.mins)}</span>
+                  <span className="font-mono text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatTimeValue(week.secs)}</span>
                 </div>
-                
+
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {week.entries.map(entry => {
-                    let itemMins = differenceInMinutes(parseISO(entry.end_time!), parseISO(entry.start_time));
-                    if (itemMins < 0) itemMins += 1440;
-                    
-                    const duration = formatMins(itemMins);
+                    let itemSecs = differenceInSeconds(parseISO(entry.end_time!), parseISO(entry.start_time));
+                    if (itemSecs < 0) itemSecs += 86400;
+
+                    const duration = formatTimeValue(itemSecs);
                     const canEdit = entry.user_id === user?.id;
                     const canDelete = canEdit || isAdmin;
 

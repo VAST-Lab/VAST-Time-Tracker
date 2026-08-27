@@ -10,7 +10,7 @@ import { useTimer } from '@/context/TimerContext'
 import { getProjects, getTeamMembers } from '@/utils/supabase/api'
 import { getMyRecentEntries, addManualEntry, updateTimeEntry, deleteTimeEntry } from '@/utils/supabase/timeApi'
 import { Project, TimeEntry, Profile } from '@/types/supabase'
-import { format, differenceInMinutes, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
+import { format, differenceInMinutes, differenceInSeconds, startOfWeek, addWeeks, subWeeks, startOfToday, differenceInCalendarWeeks, differenceInCalendarDays, subDays } from 'date-fns'
 import { ChevronDown, ChevronLeft, ChevronRight, Plus, Minus, X } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
@@ -60,17 +60,21 @@ function renderEventContent(eventInfo: EventContentArg) {
   );
 }
 
-const getExactDuration = (start: string, end: string | Date) => {
-  const mins = differenceInMinutes(new Date(end), new Date(start))
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return `${h}h ${m}m`
-}
-
 export default function CalendarPage() {
   const { user } = useAuth()
   const isAdmin = useAdmin()
-  const { activeEntry } = useTimer()
+  const { activeEntry, timeFormat } = useTimer()
+
+  const formatTimeValue = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600)
+    const m = Math.floor((totalSecs % 3600) / 60)
+    const s = totalSecs % 60
+    if (timeFormat === 'colon') {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
+    return `${h}h ${m}m`
+  }
+
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [team, setTeam] = useState<Profile[]>([])
@@ -104,10 +108,10 @@ export default function CalendarPage() {
   const [editEndTime, setEditEndTime] = useState('')
   const [editIsTentative, setEditIsTentative] = useState(false)
 
-  // Tick the current time every minute for the active timer block
+  // Tick the current time every second for the active timer block
   useEffect(() => {
-	const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-	return () => clearInterval(timer)
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
   }, [])
 
   // Trigger resize on zoom so FullCalendar recalculates event heights
@@ -144,23 +148,23 @@ export default function CalendarPage() {
       start: entry.start_time,
       end: entry.end_time || new Date().toISOString(),
       extendedProps: {
-        projectId: entry.project_id,
-        projectName: entry.projects?.name,
-        description: entry.description,
-        colorHex: entry.projects?.color_hex || '#3788d8',
-        durationStr: getExactDuration(entry.start_time, entry.end_time || new Date()),
-        isActive: false,
-        isTentative: entry.is_tentative || false,
-        isPersonal: !!entry.projects?.user_id
+      projectId: entry.project_id,
+      projectName: entry.projects?.name,
+      description: entry.description,
+      colorHex: entry.projects?.color_hex || '#3788d8',
+      isActive: false,
+      isTentative: entry.is_tentative || false,
+      isPersonal: !!entry.projects?.user_id
       }
     }))
     setDbEvents(mappedEvents)
   }
 
   // Merge the active timer block with the saved logs
- const calendarEvents = useMemo(() => {
-	const allEvents = [...dbEvents]
-	if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
+  const calendarEvents = useMemo(() => {
+    const allEvents = [...dbEvents]
+    let list = allEvents
+	  if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
       // Remove any overlapping saved entry for the active block before pushing the live one
       const filtered = allEvents.filter(e => e.id !== activeEntry.id)
       filtered.push({
@@ -168,37 +172,43 @@ export default function CalendarPage() {
         start: activeEntry.start_time,
         end: currentTime.toISOString(),
         extendedProps: {
-          projectId: activeEntry.project_id,
-          projectName: activeEntry.projects?.name || 'Running Project',
-          description: activeEntry.description,
-          colorHex: activeEntry.projects?.color_hex || '#3788d8',
-          durationStr: getExactDuration(activeEntry.start_time, currentTime),
-          isActive: true,
-          isTentative: false,
-          isPersonal: !!activeEntry.projects?.user_id
+        projectId: activeEntry.project_id,
+        projectName: activeEntry.projects?.name || 'Running Project',
+        description: activeEntry.description,
+        colorHex: activeEntry.projects?.color_hex || '#3788d8',
+        isActive: true,
+        isTentative: false,
+        isPersonal: !!activeEntry.projects?.user_id
         }
       })
-      return filtered
-    }
-    return allEvents
-  }, [dbEvents, activeEntry, currentTime])
+      list = filtered
+	  }
+
+	 return list.map(e => ({
+      ...e,
+      extendedProps: {
+        ...e.extendedProps,
+        durationStr: formatTimeValue(differenceInSeconds(new Date(e.end), new Date(e.start)))
+      }
+	  }))
+	}, [dbEvents, activeEntry, currentTime, selectedUserId, user, timeFormat])
 
   // Helper to calculate duration for the UI Modals
   const calcDuration = (start: string, end: string) => {
-    if (!start || !end) return '0h 0m'
+    if (!start || !end) return formatTimeValue(0)
     const [sh, sm] = start.split(':').map(Number)
     const [eh, em] = end.split(':').map(Number)
     let mins = (eh * 60 + em) - (sh * 60 + sm)
     if (mins < 0) mins += 24 * 60 // Handle midnight crossover
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`
+    return formatTimeValue(mins * 60)
   }
 
   // Calculate Totals based on visible events
   const totals = useMemo(() => {
-    let totalMins = 0;
-    let forecastedMins = 0;
-    let personalMins = 0;
-    let tentativeMins = 0;
+    let totalSecs = 0;
+    let forecastedSecs = 0;
+    let personalSecs = 0;
+    let tentativeSecs = 0;
 
     const startBound = currentView === 'timeGridWeek' ? startOfWeek(currentDate) : currentDate;
     const endBound = currentView === 'timeGridWeek' ? addWeeks(startBound, 1) : new Date(currentDate.getTime() + 86400000);
@@ -206,29 +216,29 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= startBound && eStart < endBound) {
-        const mins = differenceInMinutes(new Date(e.end), eStart);
-        if (e.extendedProps.isPersonal) {
-          personalMins += mins;
+      const secs = differenceInSeconds(new Date(e.end), eStart);
+      if (e.extendedProps.isPersonal) {
+        personalSecs += secs;
+      } else {
+        forecastedSecs += secs;
+        if (!e.extendedProps.isTentative) {
+        totalSecs += secs;
         } else {
-          forecastedMins += mins;
-          if (!e.extendedProps.isTentative) {
-            totalMins += mins;
-          } else {
-            tentativeMins += mins;
-          }
+        tentativeSecs += secs;
         }
+      }
       }
     });
 
-    const fTotal = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`;
+    const fTotal = (s: number) => formatTimeValue(s);
     return {
-      total: fTotal(totalMins),
-      forecasted: fTotal(forecastedMins),
-      personal: personalMins > 0 ? fTotal(personalMins) : null,
-      tentative: tentativeMins > 0 ? fTotal(tentativeMins) : null,
-      showForecasted: totalMins !== forecastedMins
+      total: fTotal(totalSecs),
+      forecasted: fTotal(forecastedSecs),
+      personal: personalSecs > 0 ? fTotal(personalSecs) : null,
+      tentative: tentativeSecs > 0 ? fTotal(tentativeSecs) : null,
+      showForecasted: totalSecs !== forecastedSecs
     };
-  }, [calendarEvents, currentView, currentDate]);
+  }, [calendarEvents, currentView, currentDate, timeFormat]);
 
   const handleEventDrop = async (dropInfo: EventDropArg) => {
     const { event } = dropInfo
@@ -363,9 +373,9 @@ export default function CalendarPage() {
   }
 
   const renderDayHeader = (arg: DayHeaderContentArg) => {
-    let totalMins = 0;
-    let personalMins = 0;
-    let tentativeMins = 0;
+    let totalSecs = 0;
+    let personalSecs = 0;
+    let tentativeSecs = 0;
 
     const dayStart = arg.date;
     const dayEnd = new Date(dayStart.getTime() + 86400000); // Add 24 hours
@@ -373,18 +383,16 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= dayStart && eStart < dayEnd) {
-      const mins = differenceInMinutes(new Date(e.end), eStart);
+      const secs = differenceInSeconds(new Date(e.end), eStart);
       if (e.extendedProps.isPersonal) {
-        personalMins += mins;
+        personalSecs += secs;
       } else if (!e.extendedProps.isTentative) {
-        totalMins += mins;
+        totalSecs += secs;
       } else {
-        tentativeMins += mins;
+        tentativeSecs += secs;
       }
       }
     });
-
-    const fTime = (m: number) => `${Math.floor(m / 60)}:${(m % 60).toString().padStart(2, '0')}`;
 
     return (
       <div className="flex flex-col items-center justify-center p-1 text-center">
@@ -392,9 +400,9 @@ export default function CalendarPage() {
           {format(arg.date, 'EEE M/d')}
         </div>
         <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-0.5 flex flex-wrap justify-center gap-x-1">
-          <span>{fTime(totalMins)}</span>
-          {personalMins > 0 ? <span className="text-blue-600 dark:text-blue-400">({fTime(personalMins)} Personal)</span> : null}
-          {tentativeMins > 0 ? <span className="text-yellow-600 dark:text-yellow-400">({fTime(tentativeMins)} Tentative)</span> : null}
+          <span>{formatTimeValue(totalSecs)}</span>
+          {personalSecs > 0 ? <span className="text-blue-600 dark:text-blue-400">({formatTimeValue(personalSecs)} Personal)</span> : null}
+          {tentativeSecs > 0 ? <span className="text-yellow-600 dark:text-yellow-400">({formatTimeValue(tentativeSecs)} Tentative)</span> : null}
         </div>
       </div>
     );
