@@ -292,10 +292,12 @@ export default function ReportsPage() {
         const clientName = `"${(e.projects?.clients?.name || 'Personal').replace(/"/g, '""')}"`
         const userName = `"${(e.profiles?.full_name || '').replace(/"/g, '""')}"`
         
-        // Fallback to start_time if created_at is missing from the database
-        const createdAt = e.created_at 
-          ? format(parseISO(e.created_at), 'yyyy-MM-dd HH:mm:ss') 
-          : format(parseISO(e.start_time), 'yyyy-MM-dd HH:mm:ss')
+        const createdAt = e.updated_at
+          ? format(parseISO(e.updated_at), 'yyyy-MM-dd HH:mm:ss')
+          : (e.created_at
+            ? format(parseISO(e.created_at), 'yyyy-MM-dd HH:mm:ss')
+            : format(parseISO(e.start_time), 'yyyy-MM-dd HH:mm:ss')
+          )
 
         csv += `${projectName},${desc},${clientName},${userName},${date},${start},${endDateVal},${end},${duration.toFixed(2)},${durationFormatted},${createdAt}\n`
       }
