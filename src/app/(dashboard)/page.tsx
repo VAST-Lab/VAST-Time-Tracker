@@ -191,8 +191,8 @@ export default function DashboardPage() {
 
     entries.forEach(entry => {
       const start = new Date(entry.start_time);
-      const wStart = startOfWeek(start, { weekStartsOn: 1 });
-      const wEnd = endOfWeek(start, { weekStartsOn: 1 });
+      const wStart = startOfWeek(start);
+      const wEnd = endOfWeek(start);
       const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`;
       const dayLabel = format(start, 'EEEE, MMM d');
 

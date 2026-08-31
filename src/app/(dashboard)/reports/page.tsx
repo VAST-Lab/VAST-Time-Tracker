@@ -139,13 +139,17 @@ export default function ReportsPage() {
 
   const loadReport = async () => {
     setIsLoading(true)
+
+    const localStart = new Date(`${startDate}T00:00:00`).toISOString()
+    const localEnd = new Date(`${endDate}T23:59:59.999`).toISOString()
+
     const { data } = await supabase
       .from('time_entries')
       .select('*, projects(*, clients(*)), profiles(full_name)')
-      .gte('start_time', `${startDate}T00:00:00.000Z`)
-      .lte('start_time', `${endDate}T23:59:59.999Z`)
+      .gte('start_time', localStart)
+      .lte('start_time', localEnd)
       .not('end_time', 'is', null)
-    
+
     setEntries(data || [])
     setIsLoading(false)
   }
@@ -213,8 +217,8 @@ export default function ReportsPage() {
       uSummary.get(uId)!.secs += secs
 
       const start = parseISO(entry.start_time)
-      const wStart = startOfWeek(start, { weekStartsOn: 1 })
-      const wEnd = endOfWeek(start, { weekStartsOn: 1 })
+      const wStart = startOfWeek(start)
+      const wEnd = endOfWeek(start)
       const weekLabel = `Week of ${format(wStart, 'MMM d')} - ${format(wEnd, 'MMM d')}`
 
       if (!wGroups.has(weekLabel)) {
@@ -255,7 +259,7 @@ export default function ReportsPage() {
   }
 
   const handleExportCSV = () => {
-    let csv = 'Project,Description,Client,User,Date,Start Time,End Time,Duration (h),Created At\n'
+    let csv = 'Project,Description,Client,User,Date,Start Time,End Date,End Time,Duration (h),Duration (HH:MM),Created At\n'
     entries.forEach(e => {
       const cId = e.projects?.client_id || 'personal'
       const passClient = selectedClients.includes(cId)
@@ -273,18 +277,27 @@ export default function ReportsPage() {
         let secs = differenceInSeconds(parseISO(e.end_time!), parseISO(e.start_time))
         if (secs < 0) secs += 86400
         const duration = secs / 3600
+        
+        const h = Math.floor(secs / 3600)
+        const m = Math.floor((secs % 3600) / 60)
+        const durationFormatted = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 
         const date = format(parseISO(e.start_time), 'yyyy-MM-dd')
         const start = format(parseISO(e.start_time), 'HH:mm')
+        const endDateVal = format(parseISO(e.end_time!), 'yyyy-MM-dd')
         const end = format(parseISO(e.end_time!), 'HH:mm')
-        
+
         const desc = `"${(e.description || '').replace(/"/g, '""')}"`
         const projectName = `"${(e.projects?.name || '').replace(/"/g, '""')}"`
         const clientName = `"${(e.projects?.clients?.name || 'Personal').replace(/"/g, '""')}"`
         const userName = `"${(e.profiles?.full_name || '').replace(/"/g, '""')}"`
-        const createdAt = e.created_at ? format(parseISO(e.created_at), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+        
+        // Fallback to start_time if created_at is missing from the database
+        const createdAt = e.created_at 
+          ? format(parseISO(e.created_at), 'yyyy-MM-dd HH:mm:ss') 
+          : format(parseISO(e.start_time), 'yyyy-MM-dd HH:mm:ss')
 
-        csv += `${projectName},${desc},${clientName},${userName},${date},${start},${end},${duration.toFixed(2)},${createdAt}\n`
+        csv += `${projectName},${desc},${clientName},${userName},${date},${start},${endDateVal},${end},${duration.toFixed(2)},${durationFormatted},${createdAt}\n`
       }
     })
 
@@ -629,10 +642,11 @@ export default function ReportsPage() {
     if (!confirm(`Are you sure you want to delete ALL time entries before ${cleanupDate}? This cannot be undone.`)) return
     setIsCleaning(true)
     try {
+      const localCleanup = new Date(`${cleanupDate}T00:00:00`).toISOString()
       const { error } = await supabase
-        .from('time_entries')
-        .delete()
-        .lt('start_time', `${cleanupDate}T00:00:00.000Z`)
+      .from('time_entries')
+      .delete()
+      .lt('start_time', localCleanup)
 
       if (error) throw error
       alert(`Successfully deleted entries before ${cleanupDate}!`)
