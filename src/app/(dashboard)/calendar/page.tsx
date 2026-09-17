@@ -19,7 +19,7 @@ function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
   const { projectName, description, durationStr, colorHex, isActive, isTentative } = event.extendedProps;
   const start = event.start;
-  const end = event.end || new Date();
+  const end = event.extendedProps.actualEnd ? new Date(event.extendedProps.actualEnd) : (event.end || new Date());
   const durationMins = start ? differenceInMinutes(end, start) : 60;
   const isShort = durationMins <= 45;
 
@@ -28,7 +28,8 @@ function renderEventContent(eventInfo: EventContentArg) {
       className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
       style={{
         borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
-        opacity: isTentative ? 0.7 : 1
+        opacity: isTentative ? 0.7 : 1,
+        minHeight: '22px'
       }}
     >
       <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
@@ -177,18 +178,25 @@ export default function CalendarPage() {
   // Merge the active timer block with the saved logs and filter based on showPersonal
   const calendarEvents = useMemo(() => {
     const visibleEvents = showPersonal ? [...dbEvents] : dbEvents.filter(e => !e.extendedProps.isPersonal)
-    let list = visibleEvents
+    let list = visibleEvents.map(e => ({ 
+      ...e, 
+      extendedProps: { 
+        ...e.extendedProps,
+        actualEnd: e.end,
+        durationStr: formatTimeValue(differenceInSeconds(new Date(e.end), new Date(e.start))) 
+      } 
+    }))
 
     if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
       const isActivePersonal = !!activeEntry.projects?.user_id;
       
       if (showPersonal || !isActivePersonal) {
-        // Remove any overlapping saved entry for the active block before pushing the live one
         const filtered = list.filter(e => e.id !== activeEntry.id)
+        const activeEnd = currentTime.toISOString()
         filtered.push({
           id: activeEntry.id,
           start: activeEntry.start_time,
-          end: currentTime.toISOString(),
+          end: activeEnd,
           extendedProps: {
             projectId: activeEntry.project_id,
             projectName: activeEntry.projects?.name || 'Running Project',
@@ -196,20 +204,28 @@ export default function CalendarPage() {
             colorHex: activeEntry.projects?.color_hex || '#3788d8',
             isActive: true,
             isTentative: false,
-            isPersonal: isActivePersonal
+            isPersonal: isActivePersonal,
+            actualEnd: activeEnd,
+            durationStr: formatTimeValue(differenceInSeconds(new Date(activeEnd), new Date(activeEntry.start_time)))
           }
         })
         list = filtered
       }
     }
 
-    return list.map(e => ({
-      ...e,
-      extendedProps: {
-        ...e.extendedProps,
-        durationStr: formatTimeValue(differenceInSeconds(new Date(e.end), new Date(e.start)))
+    list.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+
+    // Clamp small overlaps (<= 60s) strictly for visual non-overlap offset handling
+    for (let i = 0; i < list.length - 1; i++) {
+      const currentEnd = new Date(list[i].end).getTime()
+      const nextStart = new Date(list[i + 1].start).getTime()
+      
+      if (currentEnd > nextStart && (currentEnd - nextStart) <= 60000) {
+        list[i].end = list[i + 1].start
       }
-    }))
+    }
+
+    return list
   }, [dbEvents, activeEntry, currentTime, selectedUserId, user, timeFormat, showPersonal])
 
   // Helper to calculate duration for the UI Modals
@@ -235,7 +251,7 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= startBound && eStart < endBound) {
-        const secs = differenceInSeconds(new Date(e.end), eStart);
+        const secs = differenceInSeconds(new Date(e.extendedProps.actualEnd || e.end), eStart);
         if (e.extendedProps.isPersonal) {
           personalSecs += secs;
         } else {
@@ -309,7 +325,7 @@ export default function CalendarPage() {
       setEditDate(format(event.start, 'yyyy-MM-dd'))
       setEditStartTime(format(event.start, 'HH:mm'))
     }
-    setEditEndTime(event.end ? format(event.end, 'HH:mm') : '')
+    setEditEndTime(event.extendedProps.actualEnd ? format(new Date(event.extendedProps.actualEnd), 'HH:mm') : '')
     setIsEditModalOpen(true)
   }
 
@@ -408,7 +424,7 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= dayStart && eStart < dayEnd) {
-        const secs = differenceInSeconds(new Date(e.end), eStart);
+        const secs = differenceInSeconds(new Date(e.extendedProps.actualEnd || e.end), eStart);
         if (e.extendedProps.isPersonal) {
           personalSecs += secs;
         } else if (!e.extendedProps.isTentative) {
@@ -588,6 +604,7 @@ export default function CalendarPage() {
           headerToolbar={false}
           events={calendarEvents}
           eventContent={renderEventContent}
+          eventMinHeight={1}
           editable={true}
           selectable={true}
           selectMirror={true}
@@ -602,7 +619,7 @@ export default function CalendarPage() {
             const { event, jsEvent } = arg;
             const { projectName, description, durationStr } = event.extendedProps;
             const start = event.start;
-            const end = event.end || new Date();
+            const end = event.extendedProps.actualEnd ? new Date(event.extendedProps.actualEnd) : (event.end || new Date());
             const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
             
             setHoverTooltip({
