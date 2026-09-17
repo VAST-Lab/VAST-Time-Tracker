@@ -18,34 +18,31 @@ import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
 function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
   const { projectName, description, durationStr, colorHex, isActive, isTentative } = event.extendedProps;
-
   const start = event.start;
   const end = event.end || new Date();
   const durationMins = start ? differenceInMinutes(end, start) : 60;
   const isShort = durationMins <= 45;
 
   return (
-	<div
-	  className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
-	  style={{
-		borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
-		opacity: isTentative ? 0.7 : 1
-	  }}
-	>
-	  <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
-		{projectName} {isTentative && '(Tentative)'}
-	  </div>
-
-	  {!isShort && description && (
-		<div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
-		  {description}
-		</div>
-	  )}
-
-	  <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
-		{durationStr}
-	  </div>
-	</div>
+    <div
+      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
+      style={{
+        borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
+        opacity: isTentative ? 0.7 : 1
+      }}
+    >
+      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
+        {projectName} {isTentative && '(Tentative)'}
+      </div>
+      {!isShort && description && (
+        <div className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 leading-tight overflow-hidden whitespace-normal break-words">
+          {description}
+        </div>
+      )}
+      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
+        {durationStr}
+      </div>
+    </div>
   );
 }
 
@@ -70,6 +67,7 @@ export default function CalendarPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [zoomLevel, setZoomLevel] = useState(1.5)
+  const [showPersonal, setShowPersonal] = useState(true)
 
   // Custom Header States
   const calendarRef = useRef<any>(null)
@@ -77,22 +75,22 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(startOfToday())
   const [calendarTitle, setCalendarTitle] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  
+
   // Hover Tooltip State
   const [hoverTooltip, setHoverTooltip] = useState<{ x: number, y: number, description: string, projectName: string, durationStr: string, timeRangeStr: string } | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-	const handleMouseMove = (e: MouseEvent) => {
-	  if (tooltipRef.current) {
-		tooltipRef.current.style.left = `${e.clientX + 15}px`
-		tooltipRef.current.style.top = `${e.clientY + 15}px`
-	  }
-	}
-	if (hoverTooltip) {
-	  window.addEventListener('mousemove', handleMouseMove)
-	}
-	return () => window.removeEventListener('mousemove', handleMouseMove)
+    const handleMouseMove = (e: MouseEvent) => {
+      if (tooltipRef.current) {
+        tooltipRef.current.style.left = `${e.clientX + 15}px`
+        tooltipRef.current.style.top = `${e.clientY + 15}px`
+      }
+    }
+    if (hoverTooltip) {
+      window.addEventListener('mousemove', handleMouseMove)
+    }
+    return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [hoverTooltip])
 
   // Modal States
@@ -122,82 +120,97 @@ export default function CalendarPage() {
 
   // Trigger resize on zoom so FullCalendar recalculates event heights
   useEffect(() => {
-	if (calendarRef.current) {
-	  requestAnimationFrame(() => {
-		calendarRef.current?.getApi().updateSize()
-	  })
-	}
+    if (calendarRef.current) {
+      requestAnimationFrame(() => {
+        calendarRef.current?.getApi().updateSize()
+      })
+    }
   }, [zoomLevel])
 
   useEffect(() => {
-	if (user) {
-	  if (!selectedUserId) setSelectedUserId(user.id)
-	  loadCalendarData(selectedUserId || user.id)
-	}
+    if (user) {
+      if (!selectedUserId) setSelectedUserId(user.id)
+      loadCalendarData(selectedUserId || user.id)
+    }
   }, [user, selectedUserId])
 
   useEffect(() => {
-	if (isAdmin) getTeamMembers().then(setTeam)
+    if (isAdmin) getTeamMembers().then(setTeam)
   }, [isAdmin])
+
+  // Handle defaulting the Personal Projects checkbox state
+  useEffect(() => {
+    if (user) {
+      if (selectedUserId && selectedUserId !== user.id && isAdmin) {
+        setShowPersonal(false)
+      } else {
+        setShowPersonal(true)
+      }
+    }
+  }, [selectedUserId, user, isAdmin])
 
   const loadCalendarData = async (targetUserId: string) => {
     if (!user) return
     const [projData, timeData] = await Promise.all([
       getProjects(true),
       getMyRecentEntries(targetUserId)
-	])
-    
+    ])
     setProjects(projData)
-    
+
     const mappedEvents = timeData.map((entry: TimeEntry) => ({
       id: entry.id,
       start: entry.start_time,
       end: entry.end_time || new Date().toISOString(),
       extendedProps: {
-      projectId: entry.project_id,
-      projectName: entry.projects?.name,
-      description: entry.description,
-      colorHex: entry.projects?.color_hex || '#3788d8',
-      isActive: false,
-      isTentative: entry.is_tentative || false,
-      isPersonal: !!entry.projects?.user_id
+        projectId: entry.project_id,
+        projectName: entry.projects?.name,
+        description: entry.description,
+        colorHex: entry.projects?.color_hex || '#3788d8',
+        isActive: false,
+        isTentative: entry.is_tentative || false,
+        isPersonal: !!entry.projects?.user_id
       }
     }))
     setDbEvents(mappedEvents)
   }
 
-  // Merge the active timer block with the saved logs
+  // Merge the active timer block with the saved logs and filter based on showPersonal
   const calendarEvents = useMemo(() => {
-    const allEvents = [...dbEvents]
-    let list = allEvents
-	  if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
-      // Remove any overlapping saved entry for the active block before pushing the live one
-      const filtered = allEvents.filter(e => e.id !== activeEntry.id)
-      filtered.push({
-        id: activeEntry.id,
-        start: activeEntry.start_time,
-        end: currentTime.toISOString(),
-        extendedProps: {
-        projectId: activeEntry.project_id,
-        projectName: activeEntry.projects?.name || 'Running Project',
-        description: activeEntry.description,
-        colorHex: activeEntry.projects?.color_hex || '#3788d8',
-        isActive: true,
-        isTentative: false,
-        isPersonal: !!activeEntry.projects?.user_id
-        }
-      })
-      list = filtered
-	  }
+    const visibleEvents = showPersonal ? [...dbEvents] : dbEvents.filter(e => !e.extendedProps.isPersonal)
+    let list = visibleEvents
 
-	 return list.map(e => ({
+    if (activeEntry && (!selectedUserId || selectedUserId === user?.id)) {
+      const isActivePersonal = !!activeEntry.projects?.user_id;
+      
+      if (showPersonal || !isActivePersonal) {
+        // Remove any overlapping saved entry for the active block before pushing the live one
+        const filtered = list.filter(e => e.id !== activeEntry.id)
+        filtered.push({
+          id: activeEntry.id,
+          start: activeEntry.start_time,
+          end: currentTime.toISOString(),
+          extendedProps: {
+            projectId: activeEntry.project_id,
+            projectName: activeEntry.projects?.name || 'Running Project',
+            description: activeEntry.description,
+            colorHex: activeEntry.projects?.color_hex || '#3788d8',
+            isActive: true,
+            isTentative: false,
+            isPersonal: isActivePersonal
+          }
+        })
+        list = filtered
+      }
+    }
+
+    return list.map(e => ({
       ...e,
       extendedProps: {
         ...e.extendedProps,
         durationStr: formatTimeValue(differenceInSeconds(new Date(e.end), new Date(e.start)))
       }
-	  }))
-	}, [dbEvents, activeEntry, currentTime, selectedUserId, user, timeFormat])
+    }))
+  }, [dbEvents, activeEntry, currentTime, selectedUserId, user, timeFormat, showPersonal])
 
   // Helper to calculate duration for the UI Modals
   const calcDuration = (start: string, end: string) => {
@@ -222,17 +235,17 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= startBound && eStart < endBound) {
-      const secs = differenceInSeconds(new Date(e.end), eStart);
-      if (e.extendedProps.isPersonal) {
-        personalSecs += secs;
-      } else {
-        forecastedSecs += secs;
-        if (!e.extendedProps.isTentative) {
-        totalSecs += secs;
+        const secs = differenceInSeconds(new Date(e.end), eStart);
+        if (e.extendedProps.isPersonal) {
+          personalSecs += secs;
         } else {
-        tentativeSecs += secs;
+          forecastedSecs += secs;
+          if (!e.extendedProps.isTentative) {
+            totalSecs += secs;
+          } else {
+            tentativeSecs += secs;
+          }
         }
-      }
       }
     });
 
@@ -250,6 +263,7 @@ export default function CalendarPage() {
     const { event } = dropInfo
     if (event.extendedProps.isActive) return dropInfo.revert()
     if (!event.start) return dropInfo.revert()
+    
     try {
       await updateTimeEntry(event.id, {
         start_time: event.start.toISOString(),
@@ -265,6 +279,7 @@ export default function CalendarPage() {
     const { event } = resizeInfo
     if (event.extendedProps.isActive) return resizeInfo.revert()
     if (!event.end) return resizeInfo.revert()
+
     try {
       await updateTimeEntry(event.id, { end_time: event.end.toISOString() })
     } catch (error) {
@@ -279,12 +294,13 @@ export default function CalendarPage() {
     setModalEndTime(format(selectInfo.end, 'HH:mm'))
     setModalIsTentative(false)
     setIsModalOpen(true)
-    selectInfo.view.calendar.unselect() 
+    selectInfo.view.calendar.unselect()
   }
 
   const handleEventClick = (clickInfo: EventClickArg) => {
     const { event } = clickInfo
     if (event.extendedProps.isActive) return // Prevent editing the active live timer
+
     setEditId(event.id)
     setEditProjectId(event.extendedProps.projectId)
     setEditDesc(event.extendedProps.description || '')
@@ -300,28 +316,30 @@ export default function CalendarPage() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !modalProjectId) return
+
     const startIso = new Date(`${modalDate}T${modalStartTime}`).toISOString()
     const endDateObj = new Date(`${modalDate}T${modalEndTime}`)
     if (modalEndTime < modalStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
 
-      await addManualEntry({
+    await addManualEntry({
       user_id: selectedUserId || user.id,
       project_id: modalProjectId,
       description: modalDesc,
       start_time: startIso,
       end_time: endDateObj.toISOString(),
       is_tentative: modalIsTentative
-	  })
+    })
 
-	  setIsModalOpen(false)
-	  setModalProjectId('')
-	  setModalDesc('')
-	  loadCalendarData(selectedUserId || user.id)
-	}
+    setIsModalOpen(false)
+    setModalProjectId('')
+    setModalDesc('')
+    loadCalendarData(selectedUserId || user.id)
+  }
 
   const handleEditSubmit = async (e: React.FormEvent, forceTentativeValue?: boolean) => {
     e?.preventDefault()
     if (!user || !editId) return
+
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
     let endIso = null
     if (editEndTime) {
@@ -336,11 +354,11 @@ export default function CalendarPage() {
       start_time: startIso,
       end_time: endIso,
       is_tentative: forceTentativeValue !== undefined ? forceTentativeValue : editIsTentative
-	  })
+    })
 
-	  setIsEditModalOpen(false)
-	  loadCalendarData(selectedUserId || user.id)
-	}
+    setIsEditModalOpen(false)
+    loadCalendarData(selectedUserId || user.id)
+  }
 
   const handleDelete = async () => {
     if (!user || !editId) return
@@ -358,6 +376,7 @@ export default function CalendarPage() {
   const navigatePreset = (preset: string) => {
     const api = calendarRef.current?.getApi()
     if (!api) return
+
     let date = new Date()
     if (preset === 'This week' || preset === 'Today') date = new Date()
     else if (preset === 'Last week') date = subWeeks(new Date(), 1)
@@ -367,7 +386,7 @@ export default function CalendarPage() {
       const days = parseInt(preset.split(' ')[0])
       date = subDays(new Date(), days)
     }
-    
+
     api.gotoDate(date)
     setIsDropdownOpen(false)
   }
@@ -389,14 +408,14 @@ export default function CalendarPage() {
     calendarEvents.forEach(e => {
       const eStart = new Date(e.start);
       if (eStart >= dayStart && eStart < dayEnd) {
-      const secs = differenceInSeconds(new Date(e.end), eStart);
-      if (e.extendedProps.isPersonal) {
-        personalSecs += secs;
-      } else if (!e.extendedProps.isTentative) {
-        totalSecs += secs;
-      } else {
-        tentativeSecs += secs;
-      }
+        const secs = differenceInSeconds(new Date(e.end), eStart);
+        if (e.extendedProps.isPersonal) {
+          personalSecs += secs;
+        } else if (!e.extendedProps.isTentative) {
+          totalSecs += secs;
+        } else {
+          tentativeSecs += secs;
+        }
       }
     });
 
@@ -415,7 +434,7 @@ export default function CalendarPage() {
   }
 
   const getDropdownLabel = () => {
-	const today = startOfToday()
+    const today = startOfToday()
     if (currentView === 'timeGridWeek') {
       const diff = differenceInCalendarWeeks(today, currentDate, { weekStartsOn: 0 })
       if (diff === 0) return 'This week'
@@ -438,7 +457,7 @@ export default function CalendarPage() {
   return (
     <div className="h-full flex flex-col space-y-4">
       {hoverTooltip && (
-        <div 
+        <div
           ref={tooltipRef}
           className="fixed z-[99999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-2 rounded shadow-xl w-max max-w-[250px] pointer-events-none whitespace-normal break-words"
           style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
@@ -454,8 +473,8 @@ export default function CalendarPage() {
           --fc-border-color: #27272a;
           --fc-today-bg-color: rgba(39, 39, 42, 0.5);
         }
-        .fc { 
-          --fc-now-indicator-color: #3b82f6; 
+        .fc {
+          --fc-now-indicator-color: #3b82f6;
           --fc-event-border-color: transparent;
           --fc-event-bg-color: transparent;
         }
@@ -477,10 +496,11 @@ export default function CalendarPage() {
           height: calc(1.5em * ${zoomLevel}) !important;
         }
       `}</style>
-      
+
       {/* CUSTOM HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <div className="flex items-center gap-6 w-full md:w-auto">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        
+        <div className="flex items-center gap-6 w-full xl:w-auto">
           <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 shrink-0">
             <button onClick={() => handleViewChange('timeGridWeek')} className={`px-3 py-1 text-sm font-medium rounded ${currentView === 'timeGridWeek' ? 'bg-white dark:bg-zinc-950 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}`}>Week</button>
             <button onClick={() => handleViewChange('timeGridDay')} className={`px-3 py-1 text-sm font-medium rounded ${currentView === 'timeGridDay' ? 'bg-white dark:bg-zinc-950 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}`}>Day</button>
@@ -489,16 +509,30 @@ export default function CalendarPage() {
             {calendarTitle}
           </div>
         </div>
-        <div className="flex items-center justify-between w-full md:w-auto gap-4">
-          {isAdmin && team.length > 0 && (
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
+
+        <div className="flex flex-wrap items-center justify-start xl:justify-end w-full xl:w-auto gap-3 md:gap-4">
+          
+          <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-950/50 p-1 md:p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            {isAdmin && team.length > 0 && (
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs md:text-sm px-2 py-1 text-zinc-900 dark:text-zinc-100 outline-none"
               >
                 {team.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-            </select>
-          )}
+              </select>
+            )}
+            <label className="flex items-center gap-1.5 text-xs md:text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer pr-1">
+              <input 
+                type="checkbox" 
+                checked={showPersonal} 
+                onChange={e => setShowPersonal(e.target.checked)} 
+                className="rounded border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950" 
+              />
+              Personal Projects
+            </label>
+          </div>
+
           <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-md p-0.5 shrink-0">
             <button onClick={() => setZoomLevel(z => Math.max(1, z - 0.25))} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 shadow-sm" title="Decrease row height">
               <Minus size={14} />
@@ -508,39 +542,44 @@ export default function CalendarPage() {
               <Plus size={14} />
             </button>
           </div>
+
           <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
             {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
             {totals.personal && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {totals.personal}</span>}
             {totals.tentative && <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">Tentative: {totals.tentative}</span>}
           </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                {getDropdownLabel()}
+                <ChevronDown size={16} />
+              </button>
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
+                  {dropdownPresets.map(preset => (
+                    <button key={preset} onClick={() => navigatePreset(preset)} className="block w-full text-left px-4 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => navigateArrow('prev')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronLeft size={20} /></button>
+              <button onClick={() => navigateArrow('next')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronRight size={20} /></button>
+            </div>
+          </div>
           
-          <div className="relative">
-            <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800">
-              {getDropdownLabel()}
-              <ChevronDown size={16} />
-            </button>
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
-                {dropdownPresets.map(preset => (
-                  <button key={preset} onClick={() => navigatePreset(preset)} className="block w-full text-left px-4 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button onClick={() => navigateArrow('prev')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronLeft size={20} /></button>
-            <button onClick={() => navigateArrow('next')} className="p-2 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800"><ChevronRight size={20} /></button>
-          </div>
         </div>
       </div>
-
+      
       <div className="md:hidden font-bold text-center text-zinc-900 dark:text-zinc-100 text-base">
         {calendarTitle}
       </div>
-      
+
       <div className="flex-1 bg-white dark:bg-zinc-900 p-2 md:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm min-h-[500px] md:min-h-[600px] dark:text-zinc-100">
         <FullCalendar
           ref={calendarRef}
@@ -565,7 +604,7 @@ export default function CalendarPage() {
             const start = event.start;
             const end = event.end || new Date();
             const timeRangeStr = start ? `(${format(start, 'h:mma')} - ${format(end, 'h:mma')})` : '';
-
+            
             setHoverTooltip({
               x: jsEvent.clientX + 15,
               y: jsEvent.clientY + 15,
@@ -578,8 +617,8 @@ export default function CalendarPage() {
           eventMouseLeave={() => setHoverTooltip(null)}
           dayHeaderContent={renderDayHeader}
           datesSet={(arg) => {
-          setCalendarTitle(arg.view.title)
-          setCurrentDate(arg.view.currentStart)
+            setCalendarTitle(arg.view.title)
+            setCurrentDate(arg.view.currentStart)
           }}
           height="100%"
           scrollTime="09:00:00"
@@ -596,12 +635,13 @@ export default function CalendarPage() {
             </div>
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-              <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} style={{ color: projects.find(p => p.id === modalProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
-                <option value="" style={{ color: 'inherit' }}>Select Project...</option>
-                {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
-              </select>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select required value={modalProjectId} onChange={(e) => setModalProjectId(e.target.value)} style={{ color: projects.find(p => p.id === modalProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
+                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+                </select>
               </div>
+              
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description (Optional)</label>
@@ -610,16 +650,18 @@ export default function CalendarPage() {
                 <DescriptionAutocomplete
                   value={modalDesc}
                   onChange={(val, projId) => {
-                  setModalDesc(val);
-                  if (projId) setModalProjectId(projId);
+                    setModalDesc(val);
+                    if (projId) setModalProjectId(projId);
                   }}
                   className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
                 />
-                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
                 <input type="date" required value={modalDate} onChange={(e) => setModalDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
+              
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
@@ -633,10 +675,12 @@ export default function CalendarPage() {
                   {calcDuration(modalStartTime, modalEndTime)}
                 </div>
               </div>
+
               <div className="flex items-center gap-2 mt-2">
                 <input type="checkbox" id="modalTentative" checked={modalIsTentative} onChange={(e) => setModalIsTentative(e.target.checked)} className="rounded border-zinc-300" />
                 <label htmlFor="modalTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
               </div>
+
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white">Save Time</button>
@@ -656,12 +700,13 @@ export default function CalendarPage() {
             </div>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
-              <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
-                <option value="" style={{ color: 'inherit' }}>Select Project...</option>
-                {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
-              </select>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Project</label>
+                <select required value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)} style={{ color: projects.find(p => p.id === editProjectId)?.color_hex || 'inherit' }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100">
+                  <option value="" style={{ color: 'inherit' }}>Select Project...</option>
+                  {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+                </select>
               </div>
+              
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
@@ -670,16 +715,18 @@ export default function CalendarPage() {
                 <DescriptionAutocomplete
                   value={editDesc}
                   onChange={(val, projId) => {
-                  setEditDesc(val);
-                  if (projId) setEditProjectId(projId);
+                    setEditDesc(val);
+                    if (projId) setEditProjectId(projId);
                   }}
                   className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Date</label>
                 <input type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
               </div>
+              
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
@@ -693,7 +740,7 @@ export default function CalendarPage() {
                   {calcDuration(editStartTime, editEndTime)}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2 mt-2">
                 <input type="checkbox" id="editTentative" checked={editIsTentative} onChange={(e) => setEditIsTentative(e.target.checked)} className="rounded border-zinc-300" />
                 <label htmlFor="editTentative" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mark as Tentative</label>
