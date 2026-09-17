@@ -526,7 +526,14 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-start xl:justify-end w-full xl:w-auto gap-3 md:gap-4">
+        <div className="flex flex-wrap items-center justify-end w-full xl:w-auto gap-3 md:gap-4">
+
+          <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+            <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
+            {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
+            {totals.personal && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {totals.personal}</span>}
+            {totals.tentative && <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">Tentative: {totals.tentative}</span>}
+          </div>
           
           <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-950/50 p-1 md:p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
             {isAdmin && team.length > 0 && (
@@ -557,13 +564,6 @@ export default function CalendarPage() {
             <button onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 shadow-sm" title="Increase row height">
               <Plus size={14} />
             </button>
-          </div>
-
-          <div className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
-            <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total: {totals.total}</span>
-            {totals.showForecasted && <span className="text-zinc-500 dark:text-zinc-400 ml-1">(Forecasted: {totals.forecasted})</span>}
-            {totals.personal && <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">Personal: {totals.personal}</span>}
-            {totals.tentative && <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">Tentative: {totals.tentative}</span>}
           </div>
 
           <div className="flex items-center gap-2">
