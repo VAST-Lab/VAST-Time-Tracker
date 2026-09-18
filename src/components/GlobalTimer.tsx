@@ -20,10 +20,9 @@ export default function GlobalTimer() {
   const { activeEntry, elapsedSeconds, handleStart, handleStop, handleDiscard, triggerRefresh } = useTimer()
   const [projects, setProjects] = useState<Project[]>([])
   const [recentEntries, setRecentEntries] = useState<TimeEntry[]>([])
-  
   const [selectedProject, setSelectedProject] = useState('')
   const [description, setDescription] = useState('')
-  
+
   // Autocomplete State
   const [showSuggestions, setShowSuggestions] = useState(false)
   const suggestionsRef = useRef<HTMLDivElement>(null)
@@ -31,13 +30,16 @@ export default function GlobalTimer() {
   // Menu State
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  
+
   // Stop Validation State
   const [isValidatingStop, setIsValidatingStop] = useState(false)
 
   // Start Time Edit State
   const [isEditingStartTime, setIsEditingStartTime] = useState(false)
   const [editStartValue, setEditStartValue] = useState('')
+  
+  // Processing Lock State
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // Update Document Title (Browser Tab) with elapsed time
   useEffect(() => {
@@ -51,17 +53,17 @@ export default function GlobalTimer() {
 
   // Sync with active entry on load or when active entry starts/stops
   useEffect(() => {
-	if (activeEntry) {
-	  setDescription(activeEntry.description || '')
-	  setSelectedProject(activeEntry.project_id || '')
-	  setIsValidatingStop(false)
-	  setIsEditingStartTime(false)
-	} else {
-	  setDescription('')
-	  setSelectedProject('')
-	  setIsValidatingStop(false)
-	  setIsEditingStartTime(false)
-	}
+    if (activeEntry) {
+      setDescription(activeEntry.description || '')
+      setSelectedProject(activeEntry.project_id || '')
+      setIsValidatingStop(false)
+      setIsEditingStartTime(false)
+    } else {
+      setDescription('')
+      setSelectedProject('')
+      setIsValidatingStop(false)
+      setIsEditingStartTime(false)
+    }
   }, [activeEntry?.id])
 
   useEffect(() => {
@@ -72,10 +74,10 @@ export default function GlobalTimer() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-      setShowSuggestions(false)
+        setShowSuggestions(false)
       }
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-      setIsMenuOpen(false)
+        setIsMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -93,85 +95,122 @@ export default function GlobalTimer() {
     .slice(0, 5)
 
   const handleSuggestionClick = async (entry: TimeEntry) => {
-    const newDesc = entry.description || ''
-    const newProj = entry.project_id || ''
-    setDescription(newDesc)
-    setSelectedProject(newProj)
-    setShowSuggestions(false)
-
-    if (activeEntry) {
-      await updateTimeEntry(activeEntry.id, { description: newDesc, project_id: newProj || null as any })
-      triggerRefresh()
+    if (isProcessing) return
+    setIsProcessing(true)
+    try {
+      const newDesc = entry.description || ''
+      const newProj = entry.project_id || ''
+      setDescription(newDesc)
+      setSelectedProject(newProj)
+      setShowSuggestions(false)
+      if (activeEntry) {
+        await updateTimeEntry(activeEntry.id, { description: newDesc, project_id: newProj || null as any })
+        triggerRefresh()
+      }
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleProjectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newProj = e.target.value
-    setSelectedProject(newProj)
-    if (activeEntry) {
-      await updateTimeEntry(activeEntry.id, { project_id: newProj || null as any })
-      triggerRefresh()
+    if (isProcessing) return
+    setIsProcessing(true)
+    try {
+      const newProj = e.target.value
+      setSelectedProject(newProj)
+      if (activeEntry) {
+        await updateTimeEntry(activeEntry.id, { project_id: newProj || null as any })
+        triggerRefresh()
+      }
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleDescriptionBlur = async () => {
-    if (activeEntry && activeEntry.description !== description) {
-      await updateTimeEntry(activeEntry.id, { description })
-      triggerRefresh()
+    if (activeEntry && activeEntry.description !== description && !isProcessing) {
+      setIsProcessing(true)
+      try {
+        await updateTimeEntry(activeEntry.id, { description })
+        triggerRefresh()
+      } finally {
+        setIsProcessing(false)
+      }
     }
   }
 
   const handlePlayStop = async () => {
-    if (activeEntry) {
-      if (!selectedProject) {
-        setIsValidatingStop(true)
-        return
+    if (isProcessing) return
+    setIsProcessing(true)
+    try {
+      if (activeEntry) {
+        if (!selectedProject) {
+          setIsValidatingStop(true)
+          return
+        }
+        // Save description if they click stop without blurring the input
+        if (activeEntry.description !== description) {
+          await updateTimeEntry(activeEntry.id, { description })
+        }
+        await handleStop(selectedProject)
+      } else {
+        await handleStart(selectedProject || null, description)
+        setShowSuggestions(false)
       }
-      // Save description if they click stop without blurring the input
-      if (activeEntry.description !== description) {
-        await updateTimeEntry(activeEntry.id, { description })
-      }
-      await handleStop(selectedProject)
-    } else {
-      await handleStart(selectedProject || null, description)
-      setShowSuggestions(false)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleDurationClick = () => {
-	if (!activeEntry) return
-	setEditStartValue(format(new Date(activeEntry.start_time), 'HH:mm'))
-	setIsEditingStartTime(true)
+    if (!activeEntry || isProcessing) return
+    setEditStartValue(format(new Date(activeEntry.start_time), 'HH:mm'))
+    setIsEditingStartTime(true)
   }
 
   const handleStartTimeSubmit = async () => {
-	setIsEditingStartTime(false)
-	if (!activeEntry || !editStartValue) return
-
-	const originalDate = format(new Date(activeEntry.start_time), 'yyyy-MM-dd')
-	const newStartIso = new Date(`${originalDate}T${editStartValue}`).toISOString()
-
-	if (newStartIso !== activeEntry.start_time) {
-	  await updateTimeEntry(activeEntry.id, { start_time: newStartIso })
-	  triggerRefresh()
-	}
+    setIsEditingStartTime(false)
+    if (!activeEntry || !editStartValue || isProcessing) return
+    setIsProcessing(true)
+    try {
+      const originalDate = format(new Date(activeEntry.start_time), 'yyyy-MM-dd')
+      const newStartIso = new Date(`${originalDate}T${editStartValue}`).toISOString()
+      
+      if (newStartIso !== activeEntry.start_time) {
+        await updateTimeEntry(activeEntry.id, { start_time: newStartIso })
+        triggerRefresh()
+      }
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const confirmStop = async () => {
-    if (!selectedProject) return
-    if (activeEntry && activeEntry.description !== description) {
-      await updateTimeEntry(activeEntry.id, { description })
+    if (!selectedProject || isProcessing) return
+    setIsProcessing(true)
+    try {
+      if (activeEntry && activeEntry.description !== description) {
+        await updateTimeEntry(activeEntry.id, { description })
+      }
+      await handleStop(selectedProject)
+      setIsValidatingStop(false)
+    } finally {
+      setIsProcessing(false)
     }
-    await handleStop(selectedProject)
-    setIsValidatingStop(false)
   }
 
   const handleDiscardClick = async () => {
     setIsMenuOpen(false)
     if (confirm('Are you sure you want to discard this time entry?')) {
-      await handleDiscard()
-      setDescription('')
-      setSelectedProject('')
+      if (isProcessing) return
+      setIsProcessing(true)
+      try {
+        await handleDiscard()
+        setDescription('')
+        setSelectedProject('')
+      } finally {
+        setIsProcessing(false)
+      }
     }
   }
 
@@ -181,13 +220,19 @@ export default function GlobalTimer() {
       alert("Please select a project before ending this timer.")
       return
     }
-    if (activeEntry && activeEntry.description !== description) {
-      await updateTimeEntry(activeEntry.id, { description })
+    if (isProcessing) return
+    setIsProcessing(true)
+    try {
+      if (activeEntry && activeEntry.description !== description) {
+        await updateTimeEntry(activeEntry.id, { description })
+      }
+      await handleStop(selectedProject)
+      await handleStart(null, '')
+      setDescription('')
+      setSelectedProject('')
+    } finally {
+      setIsProcessing(false)
     }
-    await handleStop(selectedProject)
-    await handleStart(null, '')
-    setDescription('')
-    setSelectedProject('')
   }
 
   if (isValidatingStop) {
@@ -198,16 +243,17 @@ export default function GlobalTimer() {
         <select
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
+          disabled={isProcessing}
           style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
-          className="flex-1 bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-800 rounded text-xs px-2 py-1 outline-none [&>option]:bg-white dark:[&>option]:bg-zinc-950"
+          className="flex-1 bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-800 rounded text-xs px-2 py-1 outline-none [&>option]:bg-white dark:[&>option]:bg-zinc-950 disabled:opacity-50"
         >
           <option value="" style={{ color: 'inherit' }}>Select a project to save...</option>
           {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
         </select>
-        <button onClick={confirmStop} disabled={!selectedProject} className="px-3 py-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-xs font-medium rounded transition-colors shrink-0">
-          Save & Stop
+        <button onClick={confirmStop} disabled={!selectedProject || isProcessing} className="px-3 py-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-xs font-medium rounded transition-colors shrink-0">
+          {isProcessing ? 'Saving...' : 'Save & Stop'}
         </button>
-        <button onClick={() => setIsValidatingStop(false)} className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shrink-0">
+        <button onClick={() => setIsValidatingStop(false)} disabled={isProcessing} className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shrink-0 disabled:opacity-50">
           Cancel
         </button>
       </div>
@@ -216,7 +262,6 @@ export default function GlobalTimer() {
 
   return (
     <div className={`flex items-center gap-1 md:gap-2 ${activeEntry ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm'} border px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`} ref={suggestionsRef}>
-      
       <div className="flex-1 relative min-w-0 flex items-center">
         <input
           type="text"
@@ -226,9 +271,9 @@ export default function GlobalTimer() {
           onChange={(e) => { setDescription(e.target.value); setShowSuggestions(true); }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={handleDescriptionBlur}
-          className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+          disabled={isProcessing}
+          className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 disabled:opacity-50"
         />
-        
         {description.length >= 150 && (
           <span className="absolute right-0 -top-6 text-[10px] text-red-500 font-medium bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded shadow-sm border border-red-200 dark:border-red-900 z-10">
             {description.length}/500
@@ -237,8 +282,8 @@ export default function GlobalTimer() {
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 mt-2 w-[150%] md:w-[200%] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50">
             {suggestions.map((s, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 onMouseDown={(e) => e.preventDefault()} // Prevents input blur from firing before click registers
                 onClick={() => handleSuggestionClick(s)}
                 className="px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer border-b border-zinc-100 dark:border-zinc-800 last:border-0"
@@ -255,68 +300,72 @@ export default function GlobalTimer() {
       </div>
 
       <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0`} />
-      
+
       <select
         value={selectedProject}
         onChange={handleProjectChange}
+        disabled={isProcessing}
         style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
-        className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900"
+        className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900 disabled:opacity-50"
       >
         <option value="" style={{ color: 'inherit' }}>Project</option>
         {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
       </select>
 
       {activeEntry && (
-      <>
-        <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
-        {isEditingStartTime ? (
-        <input
-          type="time"
-          autoFocus
-          value={editStartValue}
-          onChange={(e) => setEditStartValue(e.target.value)}
-          onBlur={handleStartTimeSubmit}
-          onKeyDown={(e) => e.key === 'Enter' && handleStartTimeSubmit()}
-          className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0"
-        />
-        ) : (
-        <div
-          onClick={handleDurationClick}
-          className="font-mono text-sm md:text-base tracking-wider px-1 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80"
-          title="Click to edit start time"
-        >
-          {formatTime(elapsedSeconds)}
-        </div>
-        )}
-      </>
+        <>
+          <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
+          {isEditingStartTime ? (
+            <input
+              type="time"
+              autoFocus
+              value={editStartValue}
+              onChange={(e) => setEditStartValue(e.target.value)}
+              onBlur={handleStartTimeSubmit}
+              onKeyDown={(e) => e.key === 'Enter' && handleStartTimeSubmit()}
+              disabled={isProcessing}
+              className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0 disabled:opacity-50"
+            />
+          ) : (
+            <div
+              onClick={handleDurationClick}
+              className={`font-mono text-sm md:text-base tracking-wider px-1 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+              title="Click to edit start time"
+            >
+              {formatTime(elapsedSeconds)}
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex items-center gap-1 shrink-0" ref={menuRef}>
         <button
           onClick={handlePlayStop}
-          className={`p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0`}
+          disabled={isProcessing}
+          className={`p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0 disabled:opacity-50`}
         >
           {activeEntry ? (
-          <Square size={14} className="md:w-4 md:h-4" fill="currentColor" />
+            <Square size={14} className="md:w-4 md:h-4" fill="currentColor" />
           ) : (
-          <Play size={14} className="md:w-4 md:h-4" fill="currentColor" />
+            <Play size={14} className="md:w-4 md:h-4" fill="currentColor" />
           )}
         </button>
 
         {activeEntry && (
           <div className="relative">
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors shrink-0"
-          >
-            <MoreVertical size={18} />
-          </button>
-          {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 z-50 overflow-hidden">
-            <button onClick={handleEndAndStartNew} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">End and Start New</button>
-            <button onClick={handleDiscardClick} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Cancel and Discard</button>
-            </div>
-          )}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              disabled={isProcessing}
+              className="p-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors shrink-0 disabled:opacity-50"
+            >
+              <MoreVertical size={18} />
+            </button>
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 z-50 overflow-hidden">
+                <button onClick={handleEndAndStartNew} disabled={isProcessing} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50">End and Start New</button>
+                <button onClick={handleDiscardClick} disabled={isProcessing} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50">Cancel and Discard</button>
+              </div>
+            )}
           </div>
         )}
       </div>

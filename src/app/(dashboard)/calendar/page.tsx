@@ -278,13 +278,14 @@ export default function CalendarPage() {
   const handleEventDrop = async (dropInfo: EventDropArg) => {
     const { event } = dropInfo
     if (event.extendedProps.isActive) return dropInfo.revert()
-    if (!event.start) return dropInfo.revert()
+    if (!event.start || !user) return dropInfo.revert()
     
     try {
       await updateTimeEntry(event.id, {
         start_time: event.start.toISOString(),
         end_time: event.end ? event.end.toISOString() : null
       })
+      loadCalendarData(selectedUserId || user.id)
     } catch (error) {
       console.error('Error updating event:', error)
       dropInfo.revert()
@@ -294,10 +295,11 @@ export default function CalendarPage() {
   const handleEventResize = async (resizeInfo: EventResizeDoneArg) => {
     const { event } = resizeInfo
     if (event.extendedProps.isActive) return resizeInfo.revert()
-    if (!event.end) return resizeInfo.revert()
+    if (!event.end || !user) return resizeInfo.revert()
 
     try {
       await updateTimeEntry(event.id, { end_time: event.end.toISOString() })
+      loadCalendarData(selectedUserId || user.id)
     } catch (error) {
       console.error('Error resizing event:', error)
       resizeInfo.revert()
