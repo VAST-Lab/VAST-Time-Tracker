@@ -261,8 +261,8 @@ export default function GlobalTimer() {
   }
 
   return (
-    <div className={`flex items-center gap-1 md:gap-2 ${activeEntry ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm'} border px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`} ref={suggestionsRef}>
-      <div className="flex-1 relative min-w-0 flex items-center">
+    <div className={`flex items-center gap-0.5 sm:gap-1 md:gap-2 ${activeEntry ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm'} border px-1.5 sm:px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`} ref={suggestionsRef}>
+      <div className="flex-1 relative min-w-[60px] flex items-center">
         <input
           type="text"
           maxLength={500}
@@ -272,7 +272,7 @@ export default function GlobalTimer() {
           onFocus={() => setShowSuggestions(true)}
           onBlur={handleDescriptionBlur}
           disabled={isProcessing}
-          className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 disabled:opacity-50"
+          className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 disabled:opacity-50 shrink"
         />
         {description.length >= 150 && (
           <span className="absolute right-0 -top-6 text-[10px] text-red-500 font-medium bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded shadow-sm border border-red-200 dark:border-red-900 z-10">
@@ -298,20 +298,20 @@ export default function GlobalTimer() {
           </div>
         )}
       </div>
-
+      
       <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0`} />
-
+      
       <select
         value={selectedProject}
         onChange={handleProjectChange}
         disabled={isProcessing}
         style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
-        className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 w-24 md:w-1/3 truncate cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900 disabled:opacity-50"
+        className="bg-transparent border-none text-[10px] sm:text-xs md:text-sm focus:ring-0 px-0 sm:px-1 md:px-2 w-[70px] sm:w-24 md:w-1/3 truncate shrink cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900 disabled:opacity-50"
       >
         <option value="" style={{ color: 'inherit' }}>Project</option>
         {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
       </select>
-
+      
       {activeEntry && (
         <>
           <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
@@ -324,12 +324,12 @@ export default function GlobalTimer() {
               onBlur={handleStartTimeSubmit}
               onKeyDown={(e) => e.key === 'Enter' && handleStartTimeSubmit()}
               disabled={isProcessing}
-              className="bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0 disabled:opacity-50"
+              className="bg-transparent border-none text-[10px] sm:text-xs md:text-sm focus:ring-0 px-1 w-[80px] sm:w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0 disabled:opacity-50"
             />
           ) : (
             <div
               onClick={handleDurationClick}
-              className={`font-mono text-sm md:text-base tracking-wider px-1 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`font-mono text-[10px] sm:text-sm md:text-base tracking-tighter sm:tracking-wider px-1 sm:px-2 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
               title="Click to edit start time"
             >
               {formatTime(elapsedSeconds)}
@@ -337,28 +337,28 @@ export default function GlobalTimer() {
           )}
         </>
       )}
-
-      <div className="flex items-center gap-1 shrink-0" ref={menuRef}>
+      
+      <div className="flex items-center gap-0 sm:gap-1 shrink-0" ref={menuRef}>
         <button
           onClick={handlePlayStop}
           disabled={isProcessing}
-          className={`p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0 disabled:opacity-50`}
+          className={`p-1 sm:p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0 disabled:opacity-50`}
         >
           {activeEntry ? (
-            <Square size={14} className="md:w-4 md:h-4" fill="currentColor" />
+            <Square size={14} className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" />
           ) : (
-            <Play size={14} className="md:w-4 md:h-4" fill="currentColor" />
+            <Play size={14} className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" />
           )}
         </button>
-
+        
         {activeEntry && (
           <div className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               disabled={isProcessing}
-              className="p-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors shrink-0 disabled:opacity-50"
+              className="p-1 sm:p-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors shrink-0 disabled:opacity-50"
             >
-              <MoreVertical size={18} />
+              <MoreVertical size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
             {isMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 z-50 overflow-hidden">

@@ -261,11 +261,11 @@ export default function DashboardPage() {
             Track some time to see your frequent projects appear here!
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="flex overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 pb-4 sm:pb-0 snap-x hide-scrollbar">
             {quickStarts.map((qs, idx) => (
-              <div 
-                key={idx} 
-                className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors group"
+              <div
+                key={idx}
+                className="min-w-[260px] sm:min-w-0 shrink-0 snap-start bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors group"
               >
                 <div className="mb-4">
                   <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm md:text-base line-clamp-2 mb-1 leading-snug">
@@ -276,8 +276,7 @@ export default function DashboardPage() {
                     <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{qs.project?.name}</span>
                   </div>
                 </div>
-                
-                <button 
+                <button
                   onClick={() => handleQuickStartPlay(qs)}
                   className="w-full flex items-center justify-center gap-2 py-2 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm font-medium transition-colors border border-zinc-200 dark:border-zinc-700"
                 >
