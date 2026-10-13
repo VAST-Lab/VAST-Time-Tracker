@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useTimer } from '@/context/TimerContext'
 import DateRangePicker from '@/components/DateRangePicker'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
+import { adjustEndTime, getEndDateTime } from '@/utils/timeUtils'
 
 function parseCSVLine(text: string) {
   const ret = [];
@@ -522,10 +523,7 @@ export default function ReportsPage() {
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
     let endIso = null
     if (editEndTime) {
-      const endDateObj = new Date(`${editDate}T${editEndTime}`)
-      if (editEndTime < editStartTime) {
-        endDateObj.setDate(endDateObj.getDate() + 1)
-      }
+      const endDateObj = getEndDateTime(editDate, editStartTime, editEndTime)
       endIso = endDateObj.toISOString()
     }
 
@@ -1188,11 +1186,15 @@ export default function ReportsPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                  <input disabled={editingEntry.user_id !== user?.id} type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                  <input disabled={editingEntry.user_id !== user?.id} type="time" required value={editStartTime} onChange={(e) => {
+                    const newStart = e.target.value;
+                    setEditStartTime(newStart);
+                    if (editEndTime) setEditEndTime(adjustEndTime(newStart, editEndTime));
+                  }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
-                  <input disabled={editingEntry.user_id !== user?.id} type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
+                  <input disabled={editingEntry.user_id !== user?.id} type="time" value={editEndTime} onChange={(e) => setEditEndTime(adjustEndTime(editStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-50" />
                 </div>
               </div>
               

@@ -8,6 +8,7 @@ import { Project, TimeEntry } from '@/types/supabase'
 import { format, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfHour, addHours } from 'date-fns'
 import { Play, Plus, X } from 'lucide-react'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
+import { adjustEndTime, getEndDateTime } from '@/utils/timeUtils'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -109,8 +110,7 @@ export default function DashboardPage() {
     e.preventDefault()
     if (!user || !manualProjectId) return
     const startIso = new Date(`${manualDate}T${manualStartTime}`).toISOString()
-    const endDateObj = new Date(`${manualDate}T${manualEndTime}`)
-    if (manualEndTime < manualStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
+    const endDateObj = getEndDateTime(manualDate, manualStartTime, manualEndTime)
 
     await addManualEntry({
       user_id: user.id,
@@ -141,8 +141,7 @@ export default function DashboardPage() {
     const startIso = new Date(`${editDate}T${editStartTime}`).toISOString()
     let endIso = null
     if (editEndTime) {
-      const endDateObj = new Date(`${editDate}T${editEndTime}`)
-      if (editEndTime < editStartTime) endDateObj.setDate(endDateObj.getDate() + 1)
+      const endDateObj = getEndDateTime(editDate, editStartTime, editEndTime)
       endIso = endDateObj.toISOString()
     }
     await updateTimeEntry(editingEntry.id, {
@@ -387,8 +386,12 @@ export default function DashboardPage() {
                 <input type="date" required value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex gap-4">
-                <input type="time" required value={manualStartTime} onChange={(e) => setManualStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-                <input type="time" value={manualEndTime} onChange={(e) => setManualEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <input type="time" required value={manualStartTime} onChange={(e) => {
+                  const newStart = e.target.value;
+                  setManualStartTime(newStart);
+                  if (manualEndTime) setManualEndTime(adjustEndTime(newStart, manualEndTime));
+                }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <input type="time" value={manualEndTime} onChange={(e) => setManualEndTime(adjustEndTime(manualStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <input type="checkbox" id="dashManualTentative" checked={manualIsTentative} onChange={(e) => setManualIsTentative(e.target.checked)} className="rounded border-zinc-300" />
@@ -440,11 +443,15 @@ export default function DashboardPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" required value={editStartTime} onChange={(e) => {
+                    const newStart = e.target.value;
+                    setEditStartTime(newStart);
+                    if (editEndTime) setEditEndTime(adjustEndTime(newStart, editEndTime));
+                  }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
-                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(adjustEndTime(editStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
