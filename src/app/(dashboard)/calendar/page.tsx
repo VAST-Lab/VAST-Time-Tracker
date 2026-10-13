@@ -14,7 +14,7 @@ import { format, differenceInMinutes, differenceInSeconds, startOfWeek, addWeeks
 import { ChevronDown, ChevronLeft, ChevronRight, Plus, Minus, X } from 'lucide-react'
 import { useAdmin } from '@/hooks/useAdmin'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
-import { adjustEndTime, getEndDateTime } from '@/utils/timeUtils'
+import { adjustEndTimeOnChange, getEndDateTime } from '@/utils/timeUtils'
 
 function renderEventContent(eventInfo: EventContentArg) {
   const { event } = eventInfo;
@@ -232,9 +232,8 @@ export default function CalendarPage() {
   // Helper to calculate duration for the UI Modals
   const calcDuration = (start: string, end: string) => {
     if (!start || !end) return formatTimeValue(0)
-    const adjustedEnd = adjustEndTime(start, end)
     const [sh, sm] = start.split(':').map(Number)
-    const [eh, em] = adjustedEnd.split(':').map(Number)
+    const [eh, em] = end.split(':').map(Number)
     let mins = (eh * 60 + em) - (sh * 60 + sm)
     if (mins < 0) mins += 24 * 60 // Handle midnight crossover
     return formatTimeValue(mins * 60)
@@ -684,15 +683,11 @@ export default function CalendarPage() {
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                  <input type="time" required value={modalStartTime} onChange={(e) => {
-                    const newStart = e.target.value;
-                    setModalStartTime(newStart);
-                    if (modalEndTime) setModalEndTime(adjustEndTime(newStart, modalEndTime));
-                  }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" required value={modalStartTime} onChange={(e) => setModalStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
-                  <input type="time" required value={modalEndTime} onChange={(e) => setModalEndTime(adjustEndTime(modalStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" required value={modalEndTime} onChange={(e) => setModalEndTime(prev => adjustEndTimeOnChange(e.target.value, prev))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 text-right">
                   {calcDuration(modalStartTime, modalEndTime)}
@@ -753,15 +748,11 @@ export default function CalendarPage() {
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                  <input type="time" required value={editStartTime} onChange={(e) => {
-                    const newStart = e.target.value;
-                    setEditStartTime(newStart);
-                    if (editEndTime) setEditEndTime(adjustEndTime(newStart, editEndTime));
-                  }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
-                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(adjustEndTime(editStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(prev => adjustEndTimeOnChange(e.target.value, prev))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1 mb-2 text-sm font-mono text-zinc-600 dark:text-zinc-400 text-right">
                   {calcDuration(editStartTime, editEndTime)}

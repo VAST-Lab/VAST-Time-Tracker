@@ -8,7 +8,7 @@ import { Project, TimeEntry } from '@/types/supabase'
 import { format, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfHour, addHours } from 'date-fns'
 import { Play, Plus, X } from 'lucide-react'
 import DescriptionAutocomplete from '@/components/DescriptionAutocomplete'
-import { adjustEndTime, getEndDateTime } from '@/utils/timeUtils'
+import { adjustEndTimeOnChange, getEndDateTime } from '@/utils/timeUtils'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -386,12 +386,8 @@ export default function DashboardPage() {
                 <input type="date" required value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex gap-4">
-                <input type="time" required value={manualStartTime} onChange={(e) => {
-                  const newStart = e.target.value;
-                  setManualStartTime(newStart);
-                  if (manualEndTime) setManualEndTime(adjustEndTime(newStart, manualEndTime));
-                }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
-                <input type="time" value={manualEndTime} onChange={(e) => setManualEndTime(adjustEndTime(manualStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <input type="time" required value={manualStartTime} onChange={(e) => setManualStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                <input type="time" value={manualEndTime} onChange={(e) => setManualEndTime(prev => adjustEndTimeOnChange(e.target.value, prev))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <input type="checkbox" id="dashManualTentative" checked={manualIsTentative} onChange={(e) => setManualIsTentative(e.target.checked)} className="rounded border-zinc-300" />
@@ -443,15 +439,11 @@ export default function DashboardPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Time</label>
-                  <input type="time" required value={editStartTime} onChange={(e) => {
-                    const newStart = e.target.value;
-                    setEditStartTime(newStart);
-                    if (editEndTime) setEditEndTime(adjustEndTime(newStart, editEndTime));
-                  }} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" required value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Time</label>
-                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(adjustEndTime(editStartTime, e.target.value))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
+                  <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(prev => adjustEndTimeOnChange(e.target.value, prev))} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100" />
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
