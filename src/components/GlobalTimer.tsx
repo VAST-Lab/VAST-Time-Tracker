@@ -1,239 +1,263 @@
-'use client'
-import { useState, useEffect, useRef } from 'react'
-import { useTimer } from '@/context/TimerContext'
-import { useAuth } from '@/context/AuthContext'
-import { getProjects } from '@/utils/supabase/api'
-import { getMyRecentEntries, updateTimeEntry } from '@/utils/supabase/timeApi'
-import { Project, TimeEntry } from '@/types/supabase'
-import { Play, Square, AlertCircle, MoreVertical } from 'lucide-react'
-import { format } from 'date-fns'
+"use client";
+import { useState, useEffect, useRef } from "react";
+import { useTimer } from "@/context/TimerContext";
+import { useAuth } from "@/context/AuthContext";
+import { getProjects } from "@/utils/supabase/api";
+import { getMyRecentEntries, updateTimeEntry } from "@/utils/supabase/timeApi";
+import { Project, TimeEntry } from "@/types/supabase";
+import { Play, Square, AlertCircle, MoreVertical } from "lucide-react";
+import { format } from "date-fns";
 
 const formatTime = (totalSeconds: number) => {
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-}
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
 
 export default function GlobalTimer() {
-  const { user } = useAuth()
-  const { activeEntry, elapsedSeconds, handleStart, handleStop, handleDiscard, triggerRefresh } = useTimer()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [recentEntries, setRecentEntries] = useState<TimeEntry[]>([])
-  const [selectedProject, setSelectedProject] = useState('')
-  const [description, setDescription] = useState('')
+  const { user } = useAuth();
+  const { activeEntry, elapsedSeconds, handleStart, handleStop, handleDiscard, triggerRefresh } = useTimer();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [recentEntries, setRecentEntries] = useState<TimeEntry[]>([]);
+  const [selectedProject, setSelectedProject] = useState("");
+  const [description, setDescription] = useState("");
 
   // Autocomplete State
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   // Menu State
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Stop Validation State
-  const [isValidatingStop, setIsValidatingStop] = useState(false)
+  const [isValidatingStop, setIsValidatingStop] = useState(false);
 
   // Start Time Edit State
-  const [isEditingStartTime, setIsEditingStartTime] = useState(false)
-  const [editStartValue, setEditStartValue] = useState('')
-  
+  const [isEditingStartTime, setIsEditingStartTime] = useState(false);
+  const [editStartValue, setEditStartValue] = useState("");
+
   // Processing Lock State
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [description, showSuggestions]);
+
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+    } else if (e.key === "Enter" && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+      e.preventDefault();
+      handleSuggestionClick(suggestions[highlightedIndex]);
+      setHighlightedIndex(-1);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }
+  };
 
   // Update Document Title (Browser Tab) with elapsed time
   useEffect(() => {
-    const baseTitle = 'TimeTracker Dashboard'
+    const baseTitle = "TimeTracker Dashboard";
     if (activeEntry) {
-      document.title = `${formatTime(elapsedSeconds)} ● ${baseTitle}`
+      document.title = `${formatTime(elapsedSeconds)} ● ${baseTitle}`;
     } else {
-      document.title = baseTitle
+      document.title = baseTitle;
     }
-  }, [activeEntry, elapsedSeconds])
+  }, [activeEntry, elapsedSeconds]);
 
   // Sync with active entry on load or when active entry starts/stops
   useEffect(() => {
     if (activeEntry) {
-      setDescription(activeEntry.description || '')
-      setSelectedProject(activeEntry.project_id || '')
-      setIsValidatingStop(false)
-      setIsEditingStartTime(false)
+      setDescription(activeEntry.description || "");
+      setSelectedProject(activeEntry.project_id || "");
+      setIsValidatingStop(false);
+      setIsEditingStartTime(false);
     } else {
-      setDescription('')
-      setSelectedProject('')
-      setIsValidatingStop(false)
-      setIsEditingStartTime(false)
+      setDescription("");
+      setSelectedProject("");
+      setIsValidatingStop(false);
+      setIsEditingStartTime(false);
     }
-  }, [activeEntry?.id])
+  }, [activeEntry?.id]);
 
   useEffect(() => {
-    getProjects(true).then(setProjects)
-    if (user) getMyRecentEntries(user.id).then(setRecentEntries)
-  }, [user])
+    getProjects(true).then(setProjects);
+    if (user) getMyRecentEntries(user.id).then(setRecentEntries);
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false)
+        setShowSuggestions(false);
       }
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false)
+        setIsMenuOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Derive unique suggestions based on description input
   const suggestions = recentEntries
-    .filter(e => e.description && e.description.toLowerCase().includes(description.toLowerCase()))
+    .filter((e) => e.description && e.description.toLowerCase().includes(description.toLowerCase()))
     .reduce((acc, current) => {
-      const x = acc.find(item => item.description === current.description && item.project_id === current.project_id)
-      if (!x) acc.push(current)
-      return acc
+      const x = acc.find((item) => item.description === current.description && item.project_id === current.project_id);
+      if (!x) acc.push(current);
+      return acc;
     }, [] as TimeEntry[])
-    .slice(0, 5)
+    .slice(0, 5);
 
   const handleSuggestionClick = async (entry: TimeEntry) => {
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
-      const newDesc = entry.description || ''
-      const newProj = entry.project_id || ''
-      setDescription(newDesc)
-      setSelectedProject(newProj)
-      setShowSuggestions(false)
+      const newDesc = entry.description || "";
+      const newProj = entry.project_id || "";
+      setDescription(newDesc);
+      setSelectedProject(newProj);
+      setShowSuggestions(false);
       if (activeEntry) {
-        await updateTimeEntry(activeEntry.id, { description: newDesc, project_id: newProj || null as any })
-        triggerRefresh()
+        await updateTimeEntry(activeEntry.id, { description: newDesc, project_id: newProj || (null as any) });
+        triggerRefresh();
       }
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const handleProjectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
-      const newProj = e.target.value
-      setSelectedProject(newProj)
+      const newProj = e.target.value;
+      setSelectedProject(newProj);
       if (activeEntry) {
-        await updateTimeEntry(activeEntry.id, { project_id: newProj || null as any })
-        triggerRefresh()
+        await updateTimeEntry(activeEntry.id, { project_id: newProj || (null as any) });
+        triggerRefresh();
       }
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const handleDescriptionBlur = async () => {
     if (activeEntry && activeEntry.description !== description && !isProcessing) {
-      setIsProcessing(true)
+      setIsProcessing(true);
       try {
-        await updateTimeEntry(activeEntry.id, { description })
-        triggerRefresh()
+        await updateTimeEntry(activeEntry.id, { description });
+        triggerRefresh();
       } finally {
-        setIsProcessing(false)
+        setIsProcessing(false);
       }
     }
-  }
+  };
 
   const handlePlayStop = async () => {
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
       if (activeEntry) {
         if (!selectedProject) {
-          setIsValidatingStop(true)
-          return
+          setIsValidatingStop(true);
+          return;
         }
         // Save description if they click stop without blurring the input
         if (activeEntry.description !== description) {
-          await updateTimeEntry(activeEntry.id, { description })
+          await updateTimeEntry(activeEntry.id, { description });
         }
-        await handleStop(selectedProject)
+        await handleStop(selectedProject);
       } else {
-        await handleStart(selectedProject || null, description)
-        setShowSuggestions(false)
+        await handleStart(selectedProject || null, description);
+        setShowSuggestions(false);
       }
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const handleDurationClick = () => {
-    if (!activeEntry || isProcessing) return
-    setEditStartValue(format(new Date(activeEntry.start_time), 'HH:mm'))
-    setIsEditingStartTime(true)
-  }
+    if (!activeEntry || isProcessing) return;
+    setEditStartValue(format(new Date(activeEntry.start_time), "HH:mm"));
+    setIsEditingStartTime(true);
+  };
 
   const handleStartTimeSubmit = async () => {
-    setIsEditingStartTime(false)
-    if (!activeEntry || !editStartValue || isProcessing) return
-    setIsProcessing(true)
+    setIsEditingStartTime(false);
+    if (!activeEntry || !editStartValue || isProcessing) return;
+    setIsProcessing(true);
     try {
-      const originalDate = format(new Date(activeEntry.start_time), 'yyyy-MM-dd')
-      const newStartIso = new Date(`${originalDate}T${editStartValue}`).toISOString()
-      
+      const originalDate = format(new Date(activeEntry.start_time), "yyyy-MM-dd");
+      const newStartIso = new Date(`${originalDate}T${editStartValue}`).toISOString();
+
       if (newStartIso !== activeEntry.start_time) {
-        await updateTimeEntry(activeEntry.id, { start_time: newStartIso })
-        triggerRefresh()
+        await updateTimeEntry(activeEntry.id, { start_time: newStartIso });
+        triggerRefresh();
       }
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const confirmStop = async () => {
-    if (!selectedProject || isProcessing) return
-    setIsProcessing(true)
+    if (!selectedProject || isProcessing) return;
+    setIsProcessing(true);
     try {
       if (activeEntry && activeEntry.description !== description) {
-        await updateTimeEntry(activeEntry.id, { description })
+        await updateTimeEntry(activeEntry.id, { description });
       }
-      await handleStop(selectedProject)
-      setIsValidatingStop(false)
+      await handleStop(selectedProject);
+      setIsValidatingStop(false);
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const handleDiscardClick = async () => {
-    setIsMenuOpen(false)
-    if (confirm('Are you sure you want to discard this time entry?')) {
-      if (isProcessing) return
-      setIsProcessing(true)
+    setIsMenuOpen(false);
+    if (confirm("Are you sure you want to discard this time entry?")) {
+      if (isProcessing) return;
+      setIsProcessing(true);
       try {
-        await handleDiscard()
-        setDescription('')
-        setSelectedProject('')
+        await handleDiscard();
+        setDescription("");
+        setSelectedProject("");
       } finally {
-        setIsProcessing(false)
+        setIsProcessing(false);
       }
     }
-  }
+  };
 
   const handleEndAndStartNew = async () => {
-    setIsMenuOpen(false)
+    setIsMenuOpen(false);
     if (!selectedProject) {
-      alert("Please select a project before ending this timer.")
-      return
+      alert("Please select a project before ending this timer.");
+      return;
     }
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
       if (activeEntry && activeEntry.description !== description) {
-        await updateTimeEntry(activeEntry.id, { description })
+        await updateTimeEntry(activeEntry.id, { description });
       }
-      await handleStop(selectedProject)
-      await handleStart(null, '')
-      setDescription('')
-      setSelectedProject('')
+      await handleStop(selectedProject);
+      await handleStart(null, "");
+      setDescription("");
+      setSelectedProject("");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   if (isValidatingStop) {
     return (
@@ -244,33 +268,54 @@ export default function GlobalTimer() {
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
           disabled={isProcessing}
-          style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
+          style={{ color: projects.find((p) => p.id === selectedProject)?.color_hex || "inherit" }}
           className="flex-1 bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-800 rounded text-xs px-2 py-1 outline-none [&>option]:bg-white dark:[&>option]:bg-zinc-950 disabled:opacity-50"
         >
-          <option value="" style={{ color: 'inherit' }}>Select a project to save...</option>
-          {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+          <option value="" style={{ color: "inherit" }}>
+            Select a project to save...
+          </option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: "500" }}>
+              ● {p.name}
+            </option>
+          ))}
         </select>
-        <button onClick={confirmStop} disabled={!selectedProject || isProcessing} className="px-3 py-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-xs font-medium rounded transition-colors shrink-0">
-          {isProcessing ? 'Saving...' : 'Save & Stop'}
+        <button
+          onClick={confirmStop}
+          disabled={!selectedProject || isProcessing}
+          className="px-3 py-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-xs font-medium rounded transition-colors shrink-0"
+        >
+          {isProcessing ? "Saving..." : "Save & Stop"}
         </button>
-        <button onClick={() => setIsValidatingStop(false)} disabled={isProcessing} className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shrink-0 disabled:opacity-50">
+        <button
+          onClick={() => setIsValidatingStop(false)}
+          disabled={isProcessing}
+          className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shrink-0 disabled:opacity-50"
+        >
           Cancel
         </button>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={`flex items-center gap-0.5 sm:gap-1 md:gap-2 ${activeEntry ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm'} border px-1.5 sm:px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`} ref={suggestionsRef}>
+    <div
+      className={`flex items-center gap-0.5 sm:gap-1 md:gap-2 ${activeEntry ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 shadow-md" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm"} border px-1.5 sm:px-2 py-1.5 md:py-2 rounded-full w-full max-w-2xl mx-auto relative transition-colors`}
+      ref={suggestionsRef}
+    >
       <div className="flex-1 relative min-w-[60px] flex items-center">
         <input
           type="text"
           maxLength={500}
           placeholder="What are you working on?"
           value={description}
-          onChange={(e) => { setDescription(e.target.value); setShowSuggestions(true); }}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            setShowSuggestions(true);
+          }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={handleDescriptionBlur}
+          onKeyDown={handleDescriptionKeyDown}
           disabled={isProcessing}
           className="w-full bg-transparent border-none text-xs md:text-sm focus:ring-0 px-1 md:px-2 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 disabled:opacity-50 shrink"
         />
@@ -284,37 +329,48 @@ export default function GlobalTimer() {
             {suggestions.map((s, idx) => (
               <div
                 key={idx}
-                onMouseDown={(e) => e.preventDefault()} // Prevents input blur from firing before click registers
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setHighlightedIndex(idx)}
                 onClick={() => handleSuggestionClick(s)}
-                className="px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                className={`px-4 py-2 cursor-pointer border-b border-zinc-100 dark:border-zinc-800 last:border-0 ${
+                  idx === highlightedIndex ? "bg-zinc-100 dark:bg-zinc-800" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                }`}
               >
                 <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{s.description}</div>
                 <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 mt-0.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.projects?.color_hex || '#ccc' }} />
-                  {s.projects?.name || 'No Project'}
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.projects?.color_hex || "#ccc" }} />
+                  {s.projects?.name || "No Project"}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-      
-      <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0`} />
-      
+
+      <div className={`w-px h-4 md:h-6 ${activeEntry ? "bg-blue-200 dark:bg-blue-800" : "bg-zinc-200 dark:bg-zinc-800"} shrink-0`} />
+
       <select
         value={selectedProject}
         onChange={handleProjectChange}
         disabled={isProcessing}
-        style={{ color: projects.find(p => p.id === selectedProject)?.color_hex || 'inherit' }}
+        style={{ color: projects.find((p) => p.id === selectedProject)?.color_hex || "inherit" }}
         className="bg-transparent border-none text-[10px] sm:text-xs md:text-sm focus:ring-0 px-0 sm:px-1 md:px-2 w-[70px] sm:w-24 md:w-1/3 truncate shrink cursor-pointer [&>option]:bg-white dark:[&>option]:bg-zinc-900 disabled:opacity-50"
       >
-        <option value="" style={{ color: 'inherit' }}>Project</option>
-        {projects.map(p => <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: '500' }}>● {p.name}</option>)}
+        <option value="" style={{ color: "inherit" }}>
+          Project
+        </option>
+        {projects.map((p) => (
+          <option key={p.id} value={p.id} style={{ color: p.color_hex, fontWeight: "500" }}>
+            ● {p.name}
+          </option>
+        ))}
       </select>
-      
+
       {activeEntry && (
         <>
-          <div className={`w-px h-4 md:h-6 ${activeEntry ? 'bg-blue-200 dark:bg-blue-800' : 'bg-zinc-200 dark:bg-zinc-800'} shrink-0 hidden md:block`} />
+          <div
+            className={`w-px h-4 md:h-6 ${activeEntry ? "bg-blue-200 dark:bg-blue-800" : "bg-zinc-200 dark:bg-zinc-800"} shrink-0 hidden md:block`}
+          />
           {isEditingStartTime ? (
             <input
               type="time"
@@ -322,14 +378,14 @@ export default function GlobalTimer() {
               value={editStartValue}
               onChange={(e) => setEditStartValue(e.target.value)}
               onBlur={handleStartTimeSubmit}
-              onKeyDown={(e) => e.key === 'Enter' && handleStartTimeSubmit()}
+              onKeyDown={(e) => e.key === "Enter" && handleStartTimeSubmit()}
               disabled={isProcessing}
               className="bg-transparent border-none text-[10px] sm:text-xs md:text-sm focus:ring-0 px-1 w-[80px] sm:w-[100px] text-blue-700 dark:text-blue-400 font-mono font-medium outline-none shrink-0 disabled:opacity-50"
             />
           ) : (
             <div
               onClick={handleDurationClick}
-              className={`font-mono text-[10px] sm:text-sm md:text-base tracking-tighter sm:tracking-wider px-1 sm:px-2 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`font-mono text-[10px] sm:text-sm md:text-base tracking-tighter sm:tracking-wider px-1 sm:px-2 md:px-3 text-blue-700 dark:text-blue-400 font-medium shrink-0 cursor-pointer hover:opacity-80 ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}
               title="Click to edit start time"
             >
               {formatTime(elapsedSeconds)}
@@ -337,12 +393,12 @@ export default function GlobalTimer() {
           )}
         </>
       )}
-      
+
       <div className="flex items-center gap-0 sm:gap-1 shrink-0" ref={menuRef}>
         <button
           onClick={handlePlayStop}
           disabled={isProcessing}
-          className={`p-1 sm:p-1.5 md:p-2 ${activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900'} rounded-full transition-colors shrink-0 disabled:opacity-50`}
+          className={`p-1 sm:p-1.5 md:p-2 ${activeEntry ? "bg-red-500 hover:bg-red-600 text-white" : "bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900"} rounded-full transition-colors shrink-0 disabled:opacity-50`}
         >
           {activeEntry ? (
             <Square size={14} className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" />
@@ -350,7 +406,7 @@ export default function GlobalTimer() {
             <Play size={14} className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" />
           )}
         </button>
-        
+
         {activeEntry && (
           <div className="relative">
             <button
@@ -362,13 +418,25 @@ export default function GlobalTimer() {
             </button>
             {isMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 z-50 overflow-hidden">
-                <button onClick={handleEndAndStartNew} disabled={isProcessing} className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50">End and Start New</button>
-                <button onClick={handleDiscardClick} disabled={isProcessing} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50">Cancel and Discard</button>
+                <button
+                  onClick={handleEndAndStartNew}
+                  disabled={isProcessing}
+                  className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  End and Start New
+                </button>
+                <button
+                  onClick={handleDiscardClick}
+                  disabled={isProcessing}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                >
+                  Cancel and Discard
+                </button>
               </div>
             )}
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

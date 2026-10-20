@@ -23,17 +23,17 @@ function renderEventContent(eventInfo: EventContentArg) {
   const end = event.extendedProps.actualEnd ? new Date(event.extendedProps.actualEnd) : (event.end || new Date());
   const durationMins = start ? differenceInMinutes(end, start) : 60;
   const isShort = durationMins <= 45;
+  const isVeryShort = durationMins <= 20;
 
   return (
     <div
-      className={`w-full h-full flex ${isShort ? 'flex-row items-center px-1.5' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
+      className={`w-full h-full box-border flex ${isShort ? 'flex-row items-center px-1.5 py-0' : 'flex-col p-1.5'} rounded-sm shadow-sm overflow-hidden bg-zinc-100 dark:bg-zinc-800 transition-all ${isActive ? 'ring-1 ring-blue-500/50 opacity-95' : ''}`}
       style={{
         borderLeft: `4px ${isTentative ? 'dashed' : 'solid'} ${colorHex}`,
         opacity: isTentative ? 0.7 : 1,
-        minHeight: '22px'
       }}
     >
-      <div className={`font-bold truncate ${isShort ? 'text-[10px] flex-1' : 'text-xs'}`} style={{ color: colorHex }}>
+      <div className={`font-bold truncate leading-none ${isVeryShort ? 'text-[9px]' : isShort ? 'text-[10px]' : 'text-xs'} ${isShort ? 'flex-1' : ''}`} style={{ color: colorHex }}>
         {projectName} {isTentative && '(Tentative)'}
       </div>
       {!isShort && description && (
@@ -41,7 +41,7 @@ function renderEventContent(eventInfo: EventContentArg) {
           {description}
         </div>
       )}
-      <div className={`${isShort ? 'relative ml-1 text-[9px]' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
+      <div className={`${isShort ? 'relative ml-1 text-[9px] leading-none' : 'absolute bottom-1 right-1 text-[10px]'} font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/90 dark:bg-zinc-800/90 px-1 rounded backdrop-blur-sm shrink-0`}>
         {durationStr}
       </div>
     </div>
@@ -507,10 +507,12 @@ export default function CalendarPage() {
           background-color: transparent !important;
           border: none !important;
           box-shadow: none !important;
-          overflow: visible !important;
+          overflow: hidden !important;
+          padding: 0 !important;
         }
         .fc-timegrid-slot {
           height: calc(1.5em * ${zoomLevel}) !important;
+          box-sizing: border-box !important;
         }
       `}</style>
 
